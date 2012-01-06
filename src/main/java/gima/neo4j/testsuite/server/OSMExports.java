@@ -168,20 +168,6 @@ public class OSMExports extends OSMTests {
             System.out.println(e.toString());
         }
     }
-    
-    private void test(Layer layer) throws CQLException {
-
-        GeoPipeline pipeline = OSMGeoPipeline.startOsm( layer )
-                //step2
-        	.extractOsmPoints()
-        	//step3
-        	.groupByDensityIslands( 0.0005 )
-        	//step4
-        	.toConvexHull()
-        	//step5
-        	.toBuffer( 0.0004 );
-
-    }
 
     private static String toCoordinateText(Envelope bbox) {
         return "" + bbox.getMinX() + ", " + bbox.getMinY() + ", " + bbox.getMaxX() + ", " + bbox.getMaxY();
