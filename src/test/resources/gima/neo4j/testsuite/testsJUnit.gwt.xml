@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module>
+  <!-- Inherit our applications main module.                      -->
+  <inherits name='gima.neo4j.testsuite.tests' />
+
+  <!-- Specify the path to any remote services.                   -->
+  <servlet path="/tests/greet" class="gima.neo4j.testsuite.server.GreetingServiceImpl" />
+
+</module>
