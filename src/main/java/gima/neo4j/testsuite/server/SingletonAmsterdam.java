@@ -18,6 +18,9 @@ import org.geotools.data.DataStore;
 import org.geotools.data.neo4j.DefaultResourceInfo;
 
 import org.neo4j.collections.rtree.Envelope;
+import org.neo4j.collections.rtree.filter.SearchAll;
+import org.neo4j.collections.rtree.filter.SearchFilter;
+import org.neo4j.gis.spatial.DynamicLayerConfig;
 import org.neo4j.gis.spatial.EditableLayer;
 import org.neo4j.gis.spatial.Layer;
 import org.neo4j.gis.spatial.LineStringNetworkGenerator;
@@ -239,8 +242,10 @@ public class SingletonAmsterdam {
         double[] coord = {4.84779, 4.86592, 52.36498, 52.37478};
         Envelope bbox = new Envelope(coord[0], coord[1], coord[2], coord[3]);
 
-        osmLayer().addLayerConfig("routelines", 2, "highway is not null and geometryType(the_geom) = 'LineString'");
-        findGeometriesInLayer(osmLayer().getLayer("routelines"), bbox, true);
+        boolean removeDynamicLayer = osmLayer().removeDynamicLayer("routelines");
+        DynamicLayerConfig routelayer = osmLayer().addLayerConfig("routelines", 2, "highway is not null and geometryType(the_geom) = 'LineString'");
+        
+        //findGeometriesInLayer(routelayer, bbox, true);
 
         LineStringNetworkGenerator networkGenerator;
 
@@ -249,14 +254,14 @@ public class SingletonAmsterdam {
             // TODO put these layer nodes in relationship?
 
             // create Network Points Layer
-            EditableLayer netPointsLayer = geoDb.getOrCreateEditableLayer(osmLayer.getName() + " - network points");
-            netPointsLayer.setCoordinateReferenceSystem(osmLayer.getCoordinateReferenceSystem());
+            EditableLayer netPointsLayer = geoDb.getOrCreateEditableLayer(osmLayer().getName() + " - network points");
+            netPointsLayer.setCoordinateReferenceSystem(osmLayer().getCoordinateReferenceSystem());
 
             // create Network Edges Layer
-            EditableLayer netEdgesLayer = geoDb.getOrCreateEditableLayer(osmLayer.getName() + " - network edges");
-            netEdgesLayer.setCoordinateReferenceSystem(osmLayer.getCoordinateReferenceSystem());
+            EditableLayer netEdgesLayer = geoDb.getOrCreateEditableLayer(osmLayer().getName() + " - network edges");
+            netEdgesLayer.setCoordinateReferenceSystem(osmLayer().getCoordinateReferenceSystem());
 
-            Integer geomType = osmLayer.getGeometryType();
+            Integer geomType = osmLayer().getGeometryType();
 
             networkGenerator = new LineStringNetworkGenerator(netPointsLayer, netEdgesLayer);
 
@@ -267,17 +272,18 @@ public class SingletonAmsterdam {
 
         tx = graphDb.beginTx();
         try {
-            osmLayer.getIndex().count();
+            osmLayer().getIndex().count();
             tx.success();
         } finally {
             tx.finish();
         }
 
         try {
-            FilterCQL filter = new FilterCQL(osmLayer(),"highway is not null and geometryType(the_geom) = 'LineString'" );
-
-            GeoPipeFlow flow = filter.next();
-            List<SpatialDatabaseRecord> results = flow.getRecords();
+            List<SpatialDatabaseRecord> results = GeoPipeline
+                                        .start(osmLayer(), new SearchAll())
+                                        .cqlFilter("highway is not null and geometryType(the_geom) = 'LineString'" )
+                                        .toSpatialDatabaseRecordList();
+            System.out.println("Iterator has: " + results.size());
 
             Iterator<SpatialDatabaseRecord> it = results.iterator();
             while (it.hasNext()) {
@@ -327,6 +333,7 @@ public class SingletonAmsterdam {
         //if (layer == null) {
         //    layer = geoDb.getLayer(layerName);
         //}
+
         com.vividsolutions.jts.geom.Envelope bbox = Utilities.fromNeo4jToJts(envelope);
         // TODO why a SearchWithin and not a SearchIntersectWindow?
         //return GeoPipeline.startWithinSearch(layer, layer.getGeometryFactory().toGeometry(envelope)).toNodeList();
