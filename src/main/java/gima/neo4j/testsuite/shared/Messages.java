@@ -53,6 +53,13 @@ public class Messages {
       TEST_EXPORTLAYERS,
       TEST_BOUNDINGBOX,
       TEST_EMPTY,
+      TEST_ROUTE,
 
+  }
+  
+  public static enum Db {
+      MEDEMBLIK,
+      AMSTERDAM,
+      NL
   }
 }

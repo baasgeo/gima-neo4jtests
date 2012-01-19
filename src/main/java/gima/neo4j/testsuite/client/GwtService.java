@@ -12,10 +12,9 @@ import gima.neo4j.testsuite.shared.Messages;
  *
  * @author bartbaas
  */
-@RemoteServiceRelativePath("amsterdam")
-public interface AmsterdamService extends RemoteService {
-
-    String SendTask(Messages.Type type) throws IllegalArgumentException;
+@RemoteServiceRelativePath("messages")
+public interface GwtService extends RemoteService {
     
-    String SendTask(Messages.Type type, double[] obj) throws IllegalArgumentException;
+    String SendTask(Messages.Type type, Messages.Db db, double[] obj, boolean store) throws IllegalArgumentException;  
+    
 }

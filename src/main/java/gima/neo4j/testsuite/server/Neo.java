@@ -4,6 +4,8 @@
  */
 package gima.neo4j.testsuite.server;
 
+import com.tinkerpop.pipes.Pipe;
+import com.vividsolutions.jts.geom.Coordinate;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -17,13 +19,12 @@ import org.apache.log4j.Logger;
 import org.geotools.data.DataStore;
 import org.geotools.data.neo4j.DefaultResourceInfo;
 
+import org.geotools.feature.FeatureCollection;
 import org.neo4j.collections.rtree.Envelope;
+import org.neo4j.collections.rtree.NullListener;
 import org.neo4j.collections.rtree.filter.SearchAll;
-import org.neo4j.collections.rtree.filter.SearchFilter;
-import org.neo4j.gis.spatial.DynamicLayerConfig;
 import org.neo4j.gis.spatial.EditableLayer;
 import org.neo4j.gis.spatial.Layer;
-import org.neo4j.gis.spatial.LineStringNetworkGenerator;
 import org.neo4j.gis.spatial.SpatialDatabaseRecord;
 import org.neo4j.gis.spatial.SpatialDatabaseService;
 import org.neo4j.gis.spatial.Utilities;
@@ -31,9 +32,8 @@ import org.neo4j.gis.spatial.osm.OSMDataset;
 import org.neo4j.gis.spatial.osm.OSMGeometryEncoder;
 import org.neo4j.gis.spatial.osm.OSMImporter;
 import org.neo4j.gis.spatial.osm.OSMLayer;
-import org.neo4j.gis.spatial.pipes.GeoPipeFlow;
 import org.neo4j.gis.spatial.pipes.GeoPipeline;
-import org.neo4j.gis.spatial.pipes.filtering.FilterCQL;
+import org.neo4j.gis.spatial.pipes.processing.GML;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
@@ -47,10 +47,18 @@ import org.neo4j.kernel.impl.util.FileUtils;
  *
  * @author bartbaas
  */
-public class SingletonAmsterdam {
+public class Neo {
 
-    private static final Logger LOG = Logger.getLogger(DefaultResourceInfo.class.getName());
-    private static final Map<String, String> NORMAL_CONFIG = new HashMap<String, String>();
+    //public String layerName = "amsterdam";
+    //public File basePath = new File(System.getProperty("user.home") + "/data/neodb");//("target/var");
+    //public String osmfile = (System.getProperty("user.home") + "/data/osm/amsterdam.osm");//("target/var");
+    //public File dbPath = new File(basePath, "amsterdam.gdb");
+    public String layerName;
+    public String osmfile;
+    public File dbPath;
+    
+    
+    public static final Map<String, String> NORMAL_CONFIG = new HashMap<String, String>();
 
     static {
         NORMAL_CONFIG.put("neostore.nodestore.db.mapped_memory", "50M");
@@ -60,7 +68,7 @@ public class SingletonAmsterdam {
         NORMAL_CONFIG.put("neostore.propertystore.db.arrays.mapped_memory", "0M");
         NORMAL_CONFIG.put("dump_configuration", "false");
     }
-    private static final Map<String, String> LARGE_CONFIG = new HashMap<String, String>();
+    public static final Map<String, String> LARGE_CONFIG = new HashMap<String, String>();
 
     static {
         LARGE_CONFIG.put("neostore.nodestore.db.mapped_memory", "100M");
@@ -70,42 +78,34 @@ public class SingletonAmsterdam {
         LARGE_CONFIG.put("neostore.propertystore.db.arrays.mapped_memory", "10M");
         LARGE_CONFIG.put("dump_configuration", "true");
     }
-    private static SingletonAmsterdam _singletonObj = new SingletonAmsterdam();
-    private static Boolean _isRunning = false;
-    private final File basePath = new File(System.getProperty("user.home") + "/data/neodb");//("target/var");
-    private final String osmfile = (System.getProperty("user.home") + "/data/osm/amsterdam.osm");//("target/var");
-    private final File dbPath = new File(basePath, "amsterdam.gdb");
+    private static final Logger LOG = Logger.getLogger(DefaultResourceInfo.class.getName());
+    private Boolean _isRunning = false;
     private GraphDatabaseService graphDb;
     private SpatialDatabaseService geoDb;
     private DataStore geoStore;
-    private static OSMLayer osmLayer;
-    private String _layerName = "Amsterdam";
+    private OSMLayer osmLayer;
     private Index<Node> nodeIndex;
 
-    public static SingletonAmsterdam getInstance() {
-        return _singletonObj;
-    }
-
-    public static Boolean isRunning() {
+    public Boolean isRunning() {
         return _isRunning;
     }
 
     public String LayerName() {
-        return _layerName;
+        return layerName;
     }
 
     public OSMLayer osmLayer() {
         if (osmLayer != null) {
             return osmLayer;
         }
-        if (geoDb.containsLayer(_layerName)) {
-            osmLayer = (OSMLayer) geoDb.getLayer(_layerName);
+        if (geoDb.containsLayer(layerName)) {
+            osmLayer = (OSMLayer) geoDb.getLayer(layerName);
             return osmLayer;
         }
         return null;
     }
 
-    private SingletonAmsterdam() {
+    public Neo() {
     }
 
     private EmbeddedGraphDatabase embedDb() {
@@ -146,7 +146,7 @@ public class SingletonAmsterdam {
         }
     }
 
-    public String ImportOSM() throws IOException, XMLStreamException, InterruptedException { //(String osmfile)
+    public String ImportOSM() throws IOException, XMLStreamException, InterruptedException {
         if (_isRunning == false) {
             return "You have to start the database first.";
         } else {
@@ -154,10 +154,10 @@ public class SingletonAmsterdam {
             if (osmPath == null) {
                 return "Ïnvalid osm file.";
             }
-            System.out.println("\n=== Loading layer " + _layerName + " from " + osmPath + " ===");
+            System.out.println("\n=== Loading layer " + layerName + " from " + osmPath + " ===");
             long start = System.currentTimeMillis();
 
-            OSMImporter importer = new OSMImporter(_layerName);
+            OSMImporter importer = new OSMImporter(layerName);
             //importer.setCharset(Charset.forName("UTF-8"));
             importer.importFile(graphDb, osmPath, false, 5000);
 
@@ -174,7 +174,7 @@ public class SingletonAmsterdam {
         }
     }
 
-    public String ImportOSM_Batch() throws XMLStreamException, IOException, InterruptedException { //(String osmfile)
+    public String ImportOSM_Batch() throws XMLStreamException, IOException, InterruptedException {
         if (_isRunning == true) {
             return "You have to stop the database first.";
         } else {
@@ -185,7 +185,7 @@ public class SingletonAmsterdam {
                 return "Could not find the osm-file.";
             }
 
-            OSMImporter importer = new OSMImporter(_layerName);
+            OSMImporter importer = new OSMImporter(layerName);
             BatchInserterImpl inserter = new BatchInserterImpl(dbPath.toString());
             importer.importFile(inserter, osmfile, false);
             inserter.getGraphDbService().shutdown();
@@ -198,7 +198,7 @@ public class SingletonAmsterdam {
         }
     }
 
-    protected static String checkOSMFile(String osm) {
+    private static String checkOSMFile(String osm) {
         File osmFile = new File(osm);
         if (!osmFile.exists()) {
             osmFile = new File(new File("osm"), osm);
@@ -213,7 +213,7 @@ public class SingletonAmsterdam {
         if (_isRunning == false) {
             return "You have to start the database first.";
         }
-        Envelope bbox = new Envelope(coord[0], coord[1], coord[2], coord[3]); //double minx, double maxx, double miny, double maxy
+        Envelope bbox = new Envelope(coord[0], coord[1], coord[2], coord[3]); // double minx, double maxx, double miny, double maxy
         return findGeometriesInLayer(osmLayer(), bbox, exportimg).toString();
     }
 
@@ -224,7 +224,7 @@ public class SingletonAmsterdam {
         System.out.println("Layer has bounding box: " + bbox);
         //geoStore = new Neo4jSpatialDataStore(graphDb);
         try {
-            OSMTests.debugEnvelope(bbox, _layerName, "bbox");
+            OSMTests.debugEnvelope(bbox, layerName, "bbox");
             OSMTests.checkIndexAndFeatureCount(osmLayer());
             OSMTests.checkOSMSearch(osmLayer());
         } catch (IOException ex) {
@@ -238,16 +238,36 @@ public class SingletonAmsterdam {
         return "There are now " + geoDb.getLayerNames().length + " layers in the dataset.";
     }
 
+    public String ShortestPath(double[] route, boolean store) {
+        Layer points = geoDb.getLayer(osmLayer().getName() + " - network points");
+
+        Coordinate start = new Coordinate(route[0], route[1]);
+        Coordinate end = new Coordinate(route[2], route[3]);
+        
+        OSMRoute osmRoute = new OSMRoute(points, start, end);
+        osmRoute.dijkstra(store);
+        //osmRoute.store();
+        //osmRoute.dijkstra2();
+        //route.astar();
+        return "....";
+    }
+
     public String MakeTopology() {
         double[] coord = {4.84779, 4.86592, 52.36498, 52.37478};
         Envelope bbox = new Envelope(coord[0], coord[1], coord[2], coord[3]);
 
-        boolean removeDynamicLayer = osmLayer().removeDynamicLayer("routelines");
-        DynamicLayerConfig routelayer = osmLayer().addLayerConfig("routelines", 2, "highway is not null and geometryType(the_geom) = 'LineString'");
-        
+        try {
+            osmLayer().removeDynamicLayer("routelines");
+            geoDb.deleteLayer(osmLayer().getName() + " - network points", new NullListener());
+            geoDb.deleteLayer(osmLayer().getName() + " - network edges", new NullListener());
+            geoDb.deleteLayer("pathnodes", new NullListener());
+        } catch (Exception ex) {
+        }
+
+        //DynamicLayerConfig routelayer = osmLayer().addLayerConfig("routelines", 2, "highway is not null and geometryType(the_geom) = 'LineString'");
         //findGeometriesInLayer(routelayer, bbox, true);
 
-        LineStringNetworkGenerator networkGenerator;
+        NetworkGenerator networkGenerator;
 
         Transaction tx = graphDb.beginTx();
         try {
@@ -263,27 +283,16 @@ public class SingletonAmsterdam {
 
             Integer geomType = osmLayer().getGeometryType();
 
-            networkGenerator = new LineStringNetworkGenerator(netPointsLayer, netEdgesLayer);
+            networkGenerator = new NetworkGenerator(netPointsLayer, netEdgesLayer); //Buffer 0.00001 gives strange results
 
             tx.success();
         } finally {
             tx.finish();
         }
 
-        tx = graphDb.beginTx();
         try {
-            osmLayer().getIndex().count();
-            tx.success();
-        } finally {
-            tx.finish();
-        }
-
-        try {
-            List<SpatialDatabaseRecord> results = GeoPipeline
-                                        .start(osmLayer(), new SearchAll())
-                                        .cqlFilter("highway is not null and geometryType(the_geom) = 'LineString'" )
-                                        .toSpatialDatabaseRecordList();
-            System.out.println("Iterator has: " + results.size());
+            List<SpatialDatabaseRecord> results = GeoPipeline.start(osmLayer(), new SearchAll()).cqlFilter("highway is not null and highway not in ('cycleway','footway','pedestrain','service') and geometryType(the_geom) = 'LineString'").toSpatialDatabaseRecordList();
+            System.out.println("Found highway linestrings: " + results.size());
 
             Iterator<SpatialDatabaseRecord> it = results.iterator();
             while (it.hasNext()) {
@@ -304,7 +313,7 @@ public class SingletonAmsterdam {
             return (ex.toString());
         } finally {
         }
-        return "Not implemented yet";
+        return "Finished created network linestrings.";
     }
 
     public String ExportImages() {
@@ -329,11 +338,6 @@ public class SingletonAmsterdam {
     }
 
     private List<Node> findGeometriesInLayer(Layer layer, Envelope envelope, Boolean exportimg) {
-        //Layer layer = geoDb.getDynamicLayer(layerName);
-        //if (layer == null) {
-        //    layer = geoDb.getLayer(layerName);
-        //}
-
         com.vividsolutions.jts.geom.Envelope bbox = Utilities.fromNeo4jToJts(envelope);
         // TODO why a SearchWithin and not a SearchIntersectWindow?
         //return GeoPipeline.startWithinSearch(layer, layer.getGeometryFactory().toGeometry(envelope)).toNodeList();
@@ -386,7 +390,6 @@ public class SingletonAmsterdam {
             @Override
             public void run() {
                 graphDb.shutdown();
-                _isRunning = false;
             }
         });
     }

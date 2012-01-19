@@ -7,13 +7,13 @@
 
 <!-- Servlets -->
 <servlet>
-    <servlet-name>amsterdamServlet</servlet-name>
-    <servlet-class>gima.neo4j.testsuite.server.AmsterdamServiceImpl</servlet-class>
+    <servlet-name>gwtServlet</servlet-name>
+    <servlet-class>gima.neo4j.testsuite.server.GwtServiceImpl</servlet-class>
 </servlet>
 
 <servlet-mapping>
-    <servlet-name>amsterdamServlet</servlet-name>
-    <url-pattern>/tests/amsterdam</url-pattern>
+    <servlet-name>gwtServlet</servlet-name>
+    <url-pattern>/tests/messages</url-pattern>
 </servlet-mapping>
 
 <!-- Default page to serve -->

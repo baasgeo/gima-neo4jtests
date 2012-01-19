@@ -43,14 +43,6 @@ public class SimpleDijkstra {
         MY_TYPE
     }
 
-    @BeforeClass
-    public static void startDb()
-    {
-        String storeDir = "target/var/examples";
-        deleteFileOrDirectory( new File( storeDir ) );
-        graphDb = new EmbeddedGraphDatabase( storeDir );
-    }
-
     @Before
     public void doBefore()
     {
@@ -181,25 +173,5 @@ public class SimpleDijkstra {
                 CommonEvaluators.doubleCostEvaluator( "length" ), estimateEvaluator );
         WeightedPath path = astar.findSinglePath( nodeA, nodeB );
         // END SNIPPET: astarUsage
-    }
-
-    public static void deleteFileOrDirectory( File file )
-    {
-        if ( !file.exists() )
-        {
-            return;
-        }
-
-        if ( file.isDirectory() )
-        {
-            for ( File child : file.listFiles() )
-            {
-                deleteFileOrDirectory( child );
-            }
-        }
-        else
-        {
-            file.delete();
-        }
     }
 }

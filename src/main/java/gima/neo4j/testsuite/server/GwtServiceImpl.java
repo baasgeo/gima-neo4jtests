@@ -5,18 +5,42 @@
 package gima.neo4j.testsuite.server;
 
 import com.google.gwt.user.server.rpc.RemoteServiceServlet;
-import gima.neo4j.testsuite.client.AmsterdamService;
+import gima.neo4j.testsuite.client.GwtService;
 import gima.neo4j.testsuite.shared.Messages;
+import java.io.File;
 
 /**
  *
  * @author bartbaas
  */
-public class AmsterdamServiceImpl extends RemoteServiceServlet implements AmsterdamService {
+public class GwtServiceImpl extends RemoteServiceServlet implements GwtService {
 
-    public String SendTask(Messages.Type type, double[] obj) {
-        SingletonAmsterdam instance = SingletonAmsterdam.getInstance();
+    private static File basePath = new File(System.getProperty("user.home") + "/data/neodb");
+    private Neo amsterdamDb = new Neo();
+    private Neo medemblikDb = new Neo();
+
+    public String SendTask(Messages.Type type, Messages.Db db, double[] obj, boolean store) {
+
+        switch (db) {
+            case MEDEMBLIK:
+                medemblikDb.layerName = "Medemblik";
+                medemblikDb.dbPath = new File(basePath, "medemblik.gdb");
+                medemblikDb.osmfile = (System.getProperty("user.home") + "/data/osm/medemblik.osm");
+                return SendOperation(medemblikDb, type, obj, store);
+            case AMSTERDAM:
+                amsterdamDb.layerName = "Amsterdam";
+                amsterdamDb.dbPath = new File(basePath, "amsterdam.gdb");
+                amsterdamDb.osmfile = (System.getProperty("user.home") + "/data/osm/amsterdam.osm");
+                return SendOperation(amsterdamDb, type, obj, store);
+            case NL:
+                return "<div class=red>Not implemented yet.</red>";
+            default:
+                return "<div class=red>Not implemented yet.</red>";
+        }
         //Logger.getLogger(MedemblikServiceImpl.class.getName()).log(Level.INFO, null, "Executing task :" + type);
+    }
+
+    private String SendOperation(Neo instance, Messages.Type type, double[] obj, boolean store) {
         try {
             switch (type) {
                 case TEST_EMPTY:
@@ -43,16 +67,14 @@ public class AmsterdamServiceImpl extends RemoteServiceServlet implements Amster
                 case TEST_EXPORTLAYERS:
                     return instance.ExportImages();
                 case TEST_BOUNDINGBOX:
-                    return instance.testSearchPoints(obj, true);
+                    return instance.testSearchPoints(obj, store);
+                case TEST_ROUTE:
+                    return instance.ShortestPath(obj, store);
                 default:
                     return "<div class=red>Not implemented yet.</red>";
             }
         } catch (Exception ex) {
             return (ex.toString());
         }
-    }
-
-    public String SendTask(Messages.Type type) {
-        return SendTask(type, null);
     }
 }
