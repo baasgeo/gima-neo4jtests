@@ -21,27 +21,26 @@ import gima.neo4j.testsuite.shared.Messages;
  *
  * @author bartbaas
  */
-public class TableMedemblik extends Grid {
+public class TableNetherlands extends Grid {
 
     private boolean store = false;
     private ScrollPanel scrollPanel = new ScrollPanel();
     private HTML log = new HTML();
     private GwtMessages messages;
-    private String name = "Medemblik";
-    private String description = "Spatial tests on Open Street Map data from the Medemblik area";
-    private Messages.Db db = Messages.Db.MEDEMBLIK;
-    private double[][] routes = {{5.09060, 52.76522, 5.10949, 52.76080},
-                                 {5.11160, 52.77358, 5.10554, 52.76486}};
+    private String name = "Netherlands";
+    private String description = "Spatial tests on Open Street Map data from the Netherlands area";
+    private Messages.Db db = Messages.Db.NL;
     
-    private double[][] bboxes = {{5.09623, 52.77227, 5.10315, 52.76724}, //Meerlaan
-                                 {5.10528, 52.76338, 5.10885, 52.76078}}; 
+    private double[][] routes = {{4.8949, 52.3692, 4.8594, 52.3576},
+                                 {4.8799, 52.3931, 4.8954, 52.3996},
+                                 {4.8339, 52.3539, 4.9465, 52.3973},
+                                 {4.9217, 52.3602, 4.9412, 52.3302}};
     
-    private double[][] points = {{5.09060, 52.76522}, 
-                                 {5.10949, 52.76080},
-                                 {5.11160, 52.77358}, 
-                                 {5.10554, 52.76486}};
+    private double[][] bboxes = {{4.88557, 52.37674, 4.91214, 52.36694},  //Centre of Amsterdam
+                                 {4.84779, 52.37478, 4.86592, 52.36498},  //Old West
+                                 {4.94322, 52.34834, 4.96767, 52.33037}}; 
 
-    public TableMedemblik() {
+    public TableNetherlands() {
         this.messages = new GwtMessages(scrollPanel, log);
         this.resize(8, 4);
     }
@@ -106,7 +105,7 @@ public class TableMedemblik extends Grid {
             }
         });
         this.setWidget(4, 0, btnDelete1);
-
+        
         Label lblDelete1 = new Label(Constants.Labels.DELETE);
         lblDelete1.setStyleName(Constants.Style.SUMMARY);
         this.setWidget(4, 1, lblDelete1);
@@ -120,7 +119,7 @@ public class TableMedemblik extends Grid {
         btnImport1.addClickHandler(new ClickHandler() {
 
             public void onClick(ClickEvent event) {
-                messages.SendMessage(Messages.Type.MAKE_OSM, db, store);
+                messages.SendMessage(Messages.Type.MAKE_OSM, db);
             }
         });
         this.setWidget(6, 0, btnImport1);
@@ -177,7 +176,7 @@ public class TableMedemblik extends Grid {
         btnTest2.addClickHandler(new ClickHandler() {
 
             public void onClick(ClickEvent event) {
-                messages.SendMessage(Messages.Type.TEST_CLOSEPOINT, db, points);
+                messages.SendMessage(Messages.Type.TEST_EXPORTLAYERS, db);
             }
         });
         this.setWidget(3, 2, btnTest2);

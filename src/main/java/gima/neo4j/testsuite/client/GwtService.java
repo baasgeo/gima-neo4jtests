@@ -15,6 +15,6 @@ import gima.neo4j.testsuite.shared.Messages;
 @RemoteServiceRelativePath("messages")
 public interface GwtService extends RemoteService {
     
-    String SendTask(Messages.Type type, Messages.Db db, double[] obj, boolean store) throws IllegalArgumentException;  
+    String SendTask(Messages.Type type, Messages.Db db, double[][] obj, boolean store) throws IllegalArgumentException;  
     
 }

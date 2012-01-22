@@ -50,6 +50,7 @@ public class Messages {
       MAKE_DYNAMICLAYERS,
       MAKE_NETWORK,
       MAKE_OSM,
+      TEST_CLOSEPOINT,
       TEST_EXPORTLAYERS,
       TEST_BOUNDINGBOX,
       TEST_EMPTY,

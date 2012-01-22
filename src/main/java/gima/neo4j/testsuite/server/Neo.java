@@ -4,10 +4,11 @@
  */
 package gima.neo4j.testsuite.server;
 
-import com.tinkerpop.pipes.Pipe;
 import com.vividsolutions.jts.geom.Coordinate;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.Charset;
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -16,13 +17,11 @@ import java.util.Map;
 import javax.xml.stream.XMLStreamException;
 
 import org.apache.log4j.Logger;
-import org.geotools.data.DataStore;
 import org.geotools.data.neo4j.DefaultResourceInfo;
 
-import org.geotools.feature.FeatureCollection;
 import org.neo4j.collections.rtree.Envelope;
 import org.neo4j.collections.rtree.NullListener;
-import org.neo4j.collections.rtree.filter.SearchAll;
+import org.neo4j.gis.spatial.ConsoleListener;
 import org.neo4j.gis.spatial.EditableLayer;
 import org.neo4j.gis.spatial.Layer;
 import org.neo4j.gis.spatial.SpatialDatabaseRecord;
@@ -32,15 +31,18 @@ import org.neo4j.gis.spatial.osm.OSMDataset;
 import org.neo4j.gis.spatial.osm.OSMGeometryEncoder;
 import org.neo4j.gis.spatial.osm.OSMImporter;
 import org.neo4j.gis.spatial.osm.OSMLayer;
+import org.neo4j.gis.spatial.pipes.GeoPipeFlow;
 import org.neo4j.gis.spatial.pipes.GeoPipeline;
-import org.neo4j.gis.spatial.pipes.processing.GML;
+import org.neo4j.gis.spatial.pipes.osm.OSMGeoPipeline;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.Transaction;
-import org.neo4j.graphdb.index.Index;
 import org.neo4j.kernel.EmbeddedGraphDatabase;
 import org.neo4j.kernel.impl.batchinsert.BatchInserterImpl;
+import org.neo4j.kernel.impl.transaction.TxModule;
+import org.neo4j.kernel.impl.transaction.XaDataSourceManager;
+import org.neo4j.kernel.impl.transaction.xaframework.XaDataSource;
 import org.neo4j.kernel.impl.util.FileUtils;
 
 /**
@@ -56,8 +58,6 @@ public class Neo {
     public String layerName;
     public String osmfile;
     public File dbPath;
-    
-    
     public static final Map<String, String> NORMAL_CONFIG = new HashMap<String, String>();
 
     static {
@@ -79,15 +79,14 @@ public class Neo {
         LARGE_CONFIG.put("dump_configuration", "true");
     }
     private static final Logger LOG = Logger.getLogger(DefaultResourceInfo.class.getName());
-    private Boolean _isRunning = false;
-    private GraphDatabaseService graphDb;
-    private SpatialDatabaseService geoDb;
-    private DataStore geoStore;
+    public Map<String, String> mapConfig;
+    private Boolean isRunning = false;
+    private GraphDatabaseService graphService;
+    private SpatialDatabaseService spatialService;
     private OSMLayer osmLayer;
-    private Index<Node> nodeIndex;
 
     public Boolean isRunning() {
-        return _isRunning;
+        return isRunning;
     }
 
     public String LayerName() {
@@ -98,8 +97,8 @@ public class Neo {
         if (osmLayer != null) {
             return osmLayer;
         }
-        if (geoDb.containsLayer(layerName)) {
-            osmLayer = (OSMLayer) geoDb.getLayer(layerName);
+        if (spatialService.containsLayer(layerName)) {
+            osmLayer = (OSMLayer) spatialService.getLayer(layerName);
             return osmLayer;
         }
         return null;
@@ -109,57 +108,77 @@ public class Neo {
     }
 
     private EmbeddedGraphDatabase embedDb() {
-        return (EmbeddedGraphDatabase) graphDb;
+        return (EmbeddedGraphDatabase) graphService;
     }
 
     public String Start() {
-        if (_isRunning == true) {
+        if (isRunning == true) {
             return "Database is already running.";
         }
-        graphDb = new EmbeddedGraphDatabase(dbPath.toString(), NORMAL_CONFIG);
-        geoDb = new SpatialDatabaseService(graphDb);
-        registerShutdownHook(embedDb());
-        _isRunning = true;
 
-        // Warming up the caches
-        //if (osmLayer() != null) {
-        //    Envelope bbox = osmLayer().getIndex().getBoundingBox();
-        //    findGeometriesInLayer((EmbeddedGraphDatabase) graphDb, bbox, false).toString();
-        //}
+        graphService = new EmbeddedGraphDatabase(dbPath.toString(), mapConfig);
+        spatialService = new SpatialDatabaseService(graphService);
+        registerShutdownHook(embedDb());
+        isRunning = true;
         if (osmLayer() != null) {
             OSMDataset osmDataset = (OSMDataset) osmLayer().getDataset();
+            osmDataset.getAllGeometryNodes();
             OSMGeometryEncoder osmGeometry = (OSMGeometryEncoder) osmDataset.getGeometryEncoder();
         }
+        // get the XaDataSource for the native store
+        TxModule txModule = ((EmbeddedGraphDatabase) graphService).getConfig().getTxModule();
+        XaDataSourceManager xaDsMgr = txModule.getXaDataSourceManager();
+        XaDataSource xaDs = xaDsMgr.getXaDataSource("nioneodb");
+
+        // turn off log rotation
+        xaDs.setAutoRotate(false);
+        // increase log target size to 100MB (default 10MB)
+        //xaDs.setLogicalLogTargetSize(100 * 1024 * 1024L);
+
 
         return "Database started ...";
     }
 
     public String Stats() {
-        if (_isRunning == false) {
+        if (isRunning == false) {
             return "You have to start the database first.";
         }
+        Runtime runtime = Runtime.getRuntime();
+        long maxMemory = runtime.maxMemory();
+        long allocatedMemory = runtime.totalMemory();
+        long freeMemory = runtime.freeMemory();
+
+        String results = "<i>Java statistics:</i>";
+        results = results + "<br>Allocated memory: " + (allocatedMemory / 1048576) + " Mb";
+        results = results + "<br>Free memory: " + (freeMemory / 1048576) + " Mb";
+        results = results + "<br>Maximum available memory: " + (maxMemory / 1048576) + " Mb";
+        results = results + "<br>Total free memory: " + ((freeMemory + (maxMemory - allocatedMemory)) / 1048576) + " Mb";
 
         if (osmLayer() != null) {
-            return Tools.printDatabaseStats(osmLayer());
+            results = results + "<br>" + Tools.printDatabaseStats(osmLayer());
         } else {
-            return Tools.printDatabaseStats(geoDb);
+            results = results + "<br>" + Tools.printDatabaseStats(spatialService);
         }
+        return results;
     }
 
     public String ImportOSM() throws IOException, XMLStreamException, InterruptedException {
-        if (_isRunning == false) {
+        if (isRunning == false) {
             return "You have to start the database first.";
         } else {
             String osmPath = checkOSMFile(osmfile);
             if (osmPath == null) {
-                return "Ïnvalid osm file.";
+                return "Invalid osm file.";
             }
+
+            String results = "<i>Importing osm data:</i>";
+            results = results + "<br>Loading layer " + layerName + " from " + osmfile;
             System.out.println("\n=== Loading layer " + layerName + " from " + osmPath + " ===");
             long start = System.currentTimeMillis();
 
-            OSMImporter importer = new OSMImporter(layerName);
-            //importer.setCharset(Charset.forName("UTF-8"));
-            importer.importFile(graphDb, osmPath, false, 5000);
+            OSMImporter importer = new OSMImporter(layerName, new ConsoleListener());
+            importer.setCharset(Charset.forName("UTF-8"));
+            importer.importFile(graphService, osmPath, false, 5000);
 
             // Weird hack to force GC on large loads
             if (System.currentTimeMillis() - start > 300000) {
@@ -168,33 +187,44 @@ public class Neo {
                     Thread.sleep(1000);
                 }
             }
-            importer.reIndex(graphDb, 1000, true, false);
-            //checkOSMLayer(osm);
-            return Tools.printDatabaseStats(osmLayer());
+            importer.reIndex(graphService, 5000, true, false);
+            Stop();
+            Start();
+
+            results = results + "<br>" + Tools.printDatabaseStats(osmLayer());
+            return results;
         }
     }
 
     public String ImportOSM_Batch() throws XMLStreamException, IOException, InterruptedException {
-        if (_isRunning == true) {
+        if (isRunning == true) {
             return "You have to stop the database first.";
         } else {
-            Delete();
-            // The sequence here is: start batch inserter, import file, shutdown batch inserter, start database, reindex, shutdown database 
             String osmPath = checkOSMFile(osmfile);
             if (osmPath == null) {
                 return "Could not find the osm-file.";
             }
 
-            OSMImporter importer = new OSMImporter(layerName);
+            Delete();
+            String results = "<i>Importing osm data (batch):</i>";
+            results = results + "<br>Loading layer " + layerName + " from " + osmfile;
+            System.out.println("\n=== B A T C H :: Loading layer " + layerName + " from " + osmPath + " ===");
+
+            // The sequence here is: start batch inserter, import file, shutdown batch inserter, start database, reindex, shutdown database 
+            OSMImporter importer = new OSMImporter(layerName, new ConsoleListener());
+            importer.setCharset(Charset.forName("UTF-8"));
+
             BatchInserterImpl inserter = new BatchInserterImpl(dbPath.toString());
             importer.importFile(inserter, osmfile, false);
+
             inserter.getGraphDbService().shutdown();
-            graphDb = new EmbeddedGraphDatabase(dbPath.toString());
-            importer.reIndex(graphDb, 1000, true, false);
+            graphService = new EmbeddedGraphDatabase(dbPath.toString(), mapConfig);
+            importer.reIndex(graphService, 5000, false, false);
             Stop();
             Start();
-            //OSMTests.checkOSMSearch(osmLayer());
-            return Tools.printDatabaseStats(osmLayer());
+
+            results = results + "<br>" + Tools.printDatabaseStats(osmLayer());
+            return results;
         }
     }
 
@@ -209,12 +239,56 @@ public class Neo {
         return osmFile.getPath();
     }
 
-    public String testSearchPoints(double[] coord, Boolean exportimg) {
-        if (_isRunning == false) {
+    public String findClosestNode(double[][] coords, boolean store) {
+        if (isRunning == false) {
             return "You have to start the database first.";
         }
-        Envelope bbox = new Envelope(coord[0], coord[1], coord[2], coord[3]); // double minx, double maxx, double miny, double maxy
-        return findGeometriesInLayer(osmLayer(), bbox, exportimg).toString();
+        String results = "<i>Bouding box results:</i>";
+        for (int i = 0; i < coords.length; i++) {
+            long start = System.currentTimeMillis();
+
+            Coordinate coord = new Coordinate(coords[i][0], coords[i][1]); // Lon, Lat
+            GeoPipeFlow pipeFlow = OSMTests.findClosestNode(coord, osmLayer());
+
+            results = results + "<br>Input coordinate: " + coord.toString();
+            results = results + "<br>Found closest node at distance: " + pipeFlow.getProperty("OrthodromicDistance");
+            results = results + "<br>Node id is: " + pipeFlow.getId();
+            results = results + "<br>Nearest neighbor coordinates: " + pipeFlow.getGeometry().getCoordinate().toString();
+
+            for (String prop : pipeFlow.getPropertyNames()) {
+                if (pipeFlow.getProperty(prop) != null) {
+                    System.out.println("\t" + prop + ":" + pipeFlow.getProperty(prop));
+                }
+            }
+
+            long stop = System.currentTimeMillis();
+            results = results + "<br>Operation took: " + (stop - start) + "ms";
+            results = results + "<br>-----";
+        }
+        return results;
+    }
+
+    public String searchPoints(double[][] coords, Boolean exportimg) {
+        if (isRunning == false) {
+            return "You have to start the database first.";
+        }
+        String results = "<i>Bouding box results:</i>";
+        for (int i = 0; i < coords.length; i++) {
+            long start = System.currentTimeMillis();
+            long stop;
+            Envelope bbox = new Envelope(coords[i][0], coords[i][2], coords[i][3], coords[i][1]); // double minx, double maxx, double miny, double maxy
+            if (exportimg == true) {
+                OSMExports.exportImageSnippet(graphService, OSMTests.findGeometriesInLayer(osmLayer(), bbox), osmLayer().getName() + "_" + bbox.toString());
+                stop = System.currentTimeMillis();
+                results = results + "<br>Exported image to file: " + osmLayer().getName() + "_" + bbox.toString();
+            } else {
+                results = results + "<br>Found geometries: " + OSMTests.findGeometriesInLayer(osmLayer(), bbox).toNodeList().size();
+                stop = System.currentTimeMillis();
+            }
+            results = results + "<br>Operation took: " + (stop - start) + "ms";
+            results = results + "<br>-----";
+        }
+        return results;
     }
 
     public String DoTests() {
@@ -234,75 +308,87 @@ public class Neo {
     }
 
     public String AddDynamicLayers() {
-        OSMExports.addDynamicLayers(graphDb, osmLayer());
-        return "There are now " + geoDb.getLayerNames().length + " layers in the dataset.";
+        OSMExports.addDynamicLayers(graphService, osmLayer());
+        return "There are now " + spatialService.getLayerNames().length + " layers in the dataset.";
     }
 
-    public String ShortestPath(double[] route, boolean store) {
-        Layer points = geoDb.getLayer(osmLayer().getName() + " - network points");
+    public String ShortestPath(double[][] routes, boolean storeRoute) {
+        String results = "<i>Routing results:</i>";
 
-        Coordinate start = new Coordinate(route[0], route[1]);
-        Coordinate end = new Coordinate(route[2], route[3]);
-        
-        OSMRoute osmRoute = new OSMRoute(points, start, end);
-        osmRoute.dijkstra(store);
-        //osmRoute.store();
-        //osmRoute.dijkstra2();
-        //route.astar();
-        return "....";
+        Layer points = spatialService.getLayer(osmLayer().getName() + " - network points");
+
+        for (int i = 0; i < routes.length; i++) {
+            long start = System.currentTimeMillis();
+            Coordinate startCoord = new Coordinate(routes[i][0], routes[i][1]); // Lon, Lat
+            Coordinate endCoord = new Coordinate(routes[i][2], routes[i][3]);
+
+            OSMRoute osmRoute = new OSMRoute(points, startCoord, endCoord, storeRoute);
+            osmRoute.RouteLayerName(osmLayer().getName() + " - Route" + i);
+            results = results + "<br>Found nearby startnode: " + osmRoute.StartNodeId() + " for " + startCoord.toString();
+            results = results + "<br>Found nearby endnode: " + osmRoute.EndNodeId() + " for " + endCoord.toString();
+            results = results + "<br>" + osmRoute.dijkstra();
+            if (storeRoute) {
+                results = results + "<br>Route is stored in layer: " + osmLayer().getName() + " - Route" + i;
+            }
+            long stop = System.currentTimeMillis();
+            results = results + "<br>Operation took: " + (stop - start) + "ms";
+            results = results + "<br>-----";
+        }
+        return results;
     }
 
     public String MakeTopology() {
-        double[] coord = {4.84779, 4.86592, 52.36498, 52.37478};
-        Envelope bbox = new Envelope(coord[0], coord[1], coord[2], coord[3]);
-
+        String results = "<i>Creating routing network:</i>";
         try {
+            System.out.println("Deleting layers...");
             osmLayer().removeDynamicLayer("routelines");
-            geoDb.deleteLayer(osmLayer().getName() + " - network points", new NullListener());
-            geoDb.deleteLayer(osmLayer().getName() + " - network edges", new NullListener());
-            geoDb.deleteLayer("pathnodes", new NullListener());
+            spatialService.deleteLayer(osmLayer().getName() + " - network points", new NullListener());
+            spatialService.deleteLayer(osmLayer().getName() + " - network edges", new NullListener());
         } catch (Exception ex) {
         }
+        System.out.println("\tLayers: " + spatialService.getLayerNames().length);
 
         //DynamicLayerConfig routelayer = osmLayer().addLayerConfig("routelines", 2, "highway is not null and geometryType(the_geom) = 'LineString'");
         //findGeometriesInLayer(routelayer, bbox, true);
 
         NetworkGenerator networkGenerator;
 
-        Transaction tx = graphDb.beginTx();
-        try {
-            // TODO put these layer nodes in relationship?
+        Transaction tx = graphService.beginTx();
 
-            // create Network Points Layer
-            EditableLayer netPointsLayer = geoDb.getOrCreateEditableLayer(osmLayer().getName() + " - network points");
-            netPointsLayer.setCoordinateReferenceSystem(osmLayer().getCoordinateReferenceSystem());
+        // create Network Points Layer
+        EditableLayer netPointsLayer = spatialService.getOrCreateEditableLayer(osmLayer().getName() + " - network points");
+        netPointsLayer.setCoordinateReferenceSystem(osmLayer().getCoordinateReferenceSystem());
 
-            // create Network Edges Layer
-            EditableLayer netEdgesLayer = geoDb.getOrCreateEditableLayer(osmLayer().getName() + " - network edges");
-            netEdgesLayer.setCoordinateReferenceSystem(osmLayer().getCoordinateReferenceSystem());
+        // create Network Edges Layer
+        EditableLayer netEdgesLayer = spatialService.getOrCreateEditableLayer(osmLayer().getName() + " - network edges");
+        netEdgesLayer.setCoordinateReferenceSystem(osmLayer().getCoordinateReferenceSystem());
 
-            Integer geomType = osmLayer().getGeometryType();
+        //Integer geomType = osmLayer().getGeometryType();
+        networkGenerator = new NetworkGenerator(netPointsLayer, netEdgesLayer, 0.005); // Find nodes within 2 meter distance
 
-            networkGenerator = new NetworkGenerator(netPointsLayer, netEdgesLayer); //Buffer 0.00001 gives strange results
+        tx.success();
+        tx.finish();
 
-            tx.success();
-        } finally {
-            tx.finish();
-        }
 
         try {
-            List<SpatialDatabaseRecord> results = GeoPipeline.start(osmLayer(), new SearchAll()).cqlFilter("highway is not null and highway not in ('cycleway','footway','pedestrain','service') and geometryType(the_geom) = 'LineString'").toSpatialDatabaseRecordList();
-            System.out.println("Found highway linestrings: " + results.size());
+            // new SearchAll()
+            List<SpatialDatabaseRecord> list = OSMGeoPipeline.startOsm(osmLayer()).cqlFilter("highway is not null and highway not in ('cycleway','footway','pedestrain','service') and geometryType(the_geom) = 'LineString'") //.cqlFilter("highway is not null and geometryType(the_geom) = 'LineString'")
+                    .toSpatialDatabaseRecordList();
 
-            Iterator<SpatialDatabaseRecord> it = results.iterator();
+            int listCount = list.size();
+            System.out.println("Found highway linestrings: " + listCount);
+            results = results + "<br>Found highway linestrings: " + listCount;
+
+            Iterator<SpatialDatabaseRecord> it = list.iterator();
             while (it.hasNext()) {
-                tx = graphDb.beginTx();
+                tx = graphService.beginTx();
                 try {
                     int worked = 0;
-                    for (int i = 0; i < 1000 && it.hasNext(); i++) {
+                    for (int i = 0; i < 5000 && it.hasNext(); i++) {
                         networkGenerator.add(it.next());
                         worked++;
                     }
+                    System.out.println("Processed " + worked + " of " + listCount);
 
                     tx.success();
                 } finally {
@@ -312,46 +398,24 @@ public class Neo {
         } catch (Exception ex) {
             return (ex.toString());
         } finally {
+            System.out.println("Finished created network linestrings, created " + networkGenerator.edgePointCounter() + " edgepoints");
         }
-        return "Finished created network linestrings.";
+        results = results + "<br>Finished created network linestrings, created " + networkGenerator.edgePointCounter() + " edgepoints";
+        return results;
     }
 
     public String ExportImages() {
-        //OSMLayer osmLayer = (OSMLayer) geoDb.getLayer(_layerName);
-
-        //StyledImageExporter imageExporter = new StyledImageExporter(graphDb);
-        //imageExporter.setExportDir(System.getProperty("user.home") + "/data/export/" + osmLayer.getName());
-        //imageExporter.setZoom(1.0);
-        //imageExporter.setOffset(-0.05, -0.05);
-        //imageExporter.setSize(1024, 768);
-        //try {
-        //    imageExporter.saveLayerImage(_layerName);
-        //} catch (IOException ex) {
-        //    // Nothing
-        //}
-
         ArrayList<Layer> layers = (ArrayList<Layer>) osmLayer().getLayers();
         layers.remove(0); //remove the baselayer from the list
-        OSMExports.exportImages(graphDb, osmLayer(), layers);
+        OSMExports.exportImages(graphService, osmLayer(), layers);
         return "All layers are exported";
 
     }
 
-    private List<Node> findGeometriesInLayer(Layer layer, Envelope envelope, Boolean exportimg) {
-        com.vividsolutions.jts.geom.Envelope bbox = Utilities.fromNeo4jToJts(envelope);
-        // TODO why a SearchWithin and not a SearchIntersectWindow?
-        //return GeoPipeline.startWithinSearch(layer, layer.getGeometryFactory().toGeometry(envelope)).toNodeList();
-        GeoPipeline pipeline = GeoPipeline.startWithinSearch(layer, layer.getGeometryFactory().toGeometry(bbox));
-        if (exportimg == true) {
-            OSMExports.exportImageSnippet(graphDb, pipeline, layer.getName() + "_" + bbox.toString());
-        }
-        return pipeline.toNodeList();
-    }
-
     public void ClearData() {
-        Transaction tx = graphDb.beginTx();
+        Transaction tx = graphService.beginTx();
         try {
-            for (Node node : graphDb.getAllNodes()) {
+            for (Node node : graphService.getAllNodes()) {
                 for (Relationship rel : node.getRelationships()) {
                     rel.delete();
                 }
@@ -365,14 +429,19 @@ public class Neo {
     }
 
     public String Stop() {
-        graphDb.shutdown();
-        _isRunning = false;
+        spatialService = null;
+        graphService.shutdown();
+        graphService = null;
+        isRunning = false;
         osmLayer = null;
         return "Database shut down ...";
     }
 
     public String Delete() {
-        Stop();
+        if (isRunning == true) {
+            Stop();
+        }
+
         try {
             FileUtils.deleteRecursively(dbPath);
             return "Database deleted ...";

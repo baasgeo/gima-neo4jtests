@@ -4,6 +4,7 @@
  */
 package gima.neo4j.testsuite.server;
 
+import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.Geometry;
 import java.io.IOException;
@@ -14,11 +15,21 @@ import org.geotools.data.simple.SimpleFeatureCollection;
 import org.geotools.data.simple.SimpleFeatureSource;
 import org.neo4j.gis.spatial.Layer;
 import org.neo4j.gis.spatial.SpatialDatabaseRecord;
+import org.neo4j.gis.spatial.SpatialRelationshipTypes;
+import org.neo4j.gis.spatial.Utilities;
 import org.neo4j.gis.spatial.osm.OSMDataset;
 import org.neo4j.gis.spatial.osm.OSMDataset.Way;
 import org.neo4j.gis.spatial.osm.OSMLayer;
+import org.neo4j.gis.spatial.pipes.GeoPipeFlow;
+import org.neo4j.gis.spatial.pipes.GeoPipeline;
 import org.neo4j.gis.spatial.pipes.osm.OSMGeoPipeline;
+import org.neo4j.graphdb.Direction;
 import org.neo4j.graphdb.GraphDatabaseService;
+import org.neo4j.graphdb.Node;
+import org.neo4j.graphdb.ReturnableEvaluator;
+import org.neo4j.graphdb.StopEvaluator;
+import org.neo4j.graphdb.TraversalPosition;
+import org.neo4j.graphdb.Traverser;
 
 /**
  *
@@ -45,6 +56,26 @@ public class OSMTests {
         double height = layerBBox.getHeight() / 100.0;
         bbox = new Envelope(centre[0] - width, centre[0] + width, centre[1] - height, centre[1] + height);
         runSearches(layer, bbox, false);
+    }
+
+    public static GeoPipeFlow findClosestNode(Coordinate coordinate, Layer layer) {
+        GeoPipeline pipe = GeoPipeline.startNearestNeighborLatLonSearch(layer, coordinate, 0.5)
+                .sort("OrthodromicDistance")
+                .getMin("OrthodromicDistance")
+                .copyDatabaseRecordProperties();
+        List<GeoPipeFlow> closests = pipe.toList();
+        //System.out.println("Found close node at distance: " + closests.get(0).getProperty("OrthodromicDistance"));
+        //System.out.println("Coordinates are: " + closests.get(0).getGeometry().getCoordinate().toString());
+
+        return closests.get(0);
+    }
+    
+    public static GeoPipeline findGeometriesInLayer(Layer layer, org.neo4j.collections.rtree.Envelope envelope) {
+        com.vividsolutions.jts.geom.Envelope bbox = Utilities.fromNeo4jToJts(envelope);
+        // TODO why a SearchWithin and not a SearchIntersectWindow?
+        //return GeoPipeline.startWithinSearch(layer, layer.getGeometryFactory().toGeometry(envelope)).toNodeList();
+        GeoPipeline pipeline = GeoPipeline.startWithinSearch(layer, layer.getGeometryFactory().toGeometry(bbox));
+        return pipeline;
     }
 
     private static void runSearches(OSMLayer layer, Envelope bbox, boolean willHaveResult) {
@@ -79,7 +110,7 @@ public class OSMTests {
         System.out.println("Layer '" + layer.getName() + "' has " + layer.getIndex().count() + " entries in the index");
         GraphDatabaseService service = layer.getSpatialDatabase().getDatabase();
         DataStore store = new Neo4jSpatialDataStore(service);
-        SimpleFeatureSource featureSource = store.getFeatureSource((String)layer.getName());        
+        SimpleFeatureSource featureSource = store.getFeatureSource((String) layer.getName());
         SimpleFeatureCollection features = featureSource.getFeatures();
         //TODO fix this...
         //System.out.println("Layer '" + layer.getName() + "' has " + features.size() + " features");

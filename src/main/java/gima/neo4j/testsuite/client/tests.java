@@ -51,7 +51,8 @@ public class tests implements EntryPoint {
         verticalPanel.add(tabDashboard);
         
         VerticalPanel tabPanelMedemblik = new VerticalPanel();
-        VerticalPanel tabPanelAmsterdam = new VerticalPanel();        
+        VerticalPanel tabPanelAmsterdam = new VerticalPanel();  
+        VerticalPanel tabPanelNl = new VerticalPanel();  
 
         TableMedemblik tableMedemblik = new TableMedemblik();   
         tableMedemblik.setSize("100%", "330px");
@@ -66,10 +67,13 @@ public class tests implements EntryPoint {
         tableAmsterdam.SetupGui();
         tabPanelAmsterdam.add(tableAmsterdam);
         tabPanelAmsterdam.add(tableAmsterdam.LogPanel());
-
-        FlexTable flexTableNL = new FlexTable();
-        tabDashboard.add(flexTableNL, "The Netherlands", false);
-        flexTableNL.setSize("400px", "400px");
+        
+        TableNetherlands tableNl = new TableNetherlands(); 
+        tableNl.setSize("100%", "330px");
+        tabDashboard.add(tabPanelNl, tableNl.Name(), false);
+        tableNl.SetupGui();
+        tabPanelNl.add(tableNl);
+        tabPanelNl.add(tableNl.LogPanel());
 
         tabDashboard.selectTab(0);
     }

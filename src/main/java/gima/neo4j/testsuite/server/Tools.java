@@ -74,7 +74,7 @@ public class Tools {
         bd = bd.setScale(2, BigDecimal.ROUND_HALF_UP);
         
         String output =
-        "Database stats:"
+        "<i>Database stats:</i>"
         + "<br>Total disk usage:     "+bd.longValue()+"MB"
         + "<br>Total # nodes:        "+countNodes(Node.class, graphDb)
         + "<br>Total # rels:         "+countNodes(Relationship.class, graphDb)

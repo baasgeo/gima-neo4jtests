@@ -2,7 +2,7 @@
  * To change this template, choose Tools | Templates
  * and open the template in the editor.
  */
-package gima.neo4j.testsuite.server;
+package gima.neo4j.testsuite.old;
 
 /**
  *

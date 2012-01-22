@@ -41,11 +41,11 @@ public class GwtMessages {
         SendMessage(task, db, null, store);
     }
 
-    public void SendMessage(Messages.Type task, Messages.Db db, double[] obj) {
+    public void SendMessage(Messages.Type task, Messages.Db db, double[][] obj) {
         SendMessage(task, db, obj, false);
     }
 
-    public void SendMessage(Messages.Type task, Messages.Db db, double[] obj, boolean store) {
+    public void SendMessage(Messages.Type task, Messages.Db db, double[][] obj, boolean store) {
         Log("<div class=green>Sending task '" + task.toString() + "'</div>");
         if (gwtService == null) {
             gwtService = GWT.create(GwtService.class);
