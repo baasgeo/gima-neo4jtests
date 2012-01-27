@@ -8,7 +8,6 @@ import com.vividsolutions.jts.geom.Coordinate;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
-import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -27,12 +26,9 @@ import org.neo4j.gis.spatial.Layer;
 import org.neo4j.gis.spatial.SpatialDatabaseRecord;
 import org.neo4j.gis.spatial.SpatialDatabaseService;
 import org.neo4j.gis.spatial.Utilities;
-import org.neo4j.gis.spatial.osm.OSMDataset;
-import org.neo4j.gis.spatial.osm.OSMGeometryEncoder;
 import org.neo4j.gis.spatial.osm.OSMImporter;
 import org.neo4j.gis.spatial.osm.OSMLayer;
 import org.neo4j.gis.spatial.pipes.GeoPipeFlow;
-import org.neo4j.gis.spatial.pipes.GeoPipeline;
 import org.neo4j.gis.spatial.pipes.osm.OSMGeoPipeline;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
@@ -120,20 +116,16 @@ public class Neo {
         spatialService = new SpatialDatabaseService(graphService);
         registerShutdownHook(embedDb());
         isRunning = true;
-        if (osmLayer() != null) {
-            OSMDataset osmDataset = (OSMDataset) osmLayer().getDataset();
-            osmDataset.getAllGeometryNodes();
-            OSMGeometryEncoder osmGeometry = (OSMGeometryEncoder) osmDataset.getGeometryEncoder();
-        }
+
         // get the XaDataSource for the native store
-        TxModule txModule = ((EmbeddedGraphDatabase) graphService).getConfig().getTxModule();
+        TxModule txModule = embedDb().getConfig().getTxModule();
         XaDataSourceManager xaDsMgr = txModule.getXaDataSourceManager();
         XaDataSource xaDs = xaDsMgr.getXaDataSource("nioneodb");
 
         // turn off log rotation
-        xaDs.setAutoRotate(false);
+        //xaDs.setAutoRotate(false);
         // increase log target size to 100MB (default 10MB)
-        //xaDs.setLogicalLogTargetSize(100 * 1024 * 1024L);
+        xaDs.setLogicalLogTargetSize(100 * 1024 * 1024L);
 
 
         return "Database started ...";
@@ -149,15 +141,15 @@ public class Neo {
         long freeMemory = runtime.freeMemory();
 
         String results = "<i>Java statistics:</i>";
+        results = results + "<br>Available memory: " + (maxMemory / 1048576) + " Mb";
         results = results + "<br>Allocated memory: " + (allocatedMemory / 1048576) + " Mb";
         results = results + "<br>Free memory: " + (freeMemory / 1048576) + " Mb";
-        results = results + "<br>Maximum available memory: " + (maxMemory / 1048576) + " Mb";
-        results = results + "<br>Total free memory: " + ((freeMemory + (maxMemory - allocatedMemory)) / 1048576) + " Mb";
+        results = results + "<br>Memory in use: " + ((allocatedMemory - freeMemory) / 1048576) + " Mb";
 
         if (osmLayer() != null) {
-            results = results + "<br>" + Tools.printDatabaseStats(osmLayer());
+            results = results + "<br>" + OSMStats.printDatabaseStats(osmLayer());
         } else {
-            results = results + "<br>" + Tools.printDatabaseStats(spatialService);
+            results = results + "<br>" + OSMStats.printDatabaseStats(spatialService);
         }
         return results;
     }
@@ -177,7 +169,7 @@ public class Neo {
             long start = System.currentTimeMillis();
 
             OSMImporter importer = new OSMImporter(layerName, new ConsoleListener());
-            importer.setCharset(Charset.forName("UTF-8"));
+            //importer.setCharset(Charset.forName("UTF-8"));
             importer.importFile(graphService, osmPath, false, 5000);
 
             // Weird hack to force GC on large loads
@@ -191,7 +183,7 @@ public class Neo {
             Stop();
             Start();
 
-            results = results + "<br>" + Tools.printDatabaseStats(osmLayer());
+            results = results + "<br>" + OSMStats.printDatabaseStats(osmLayer());
             return results;
         }
     }
@@ -212,18 +204,18 @@ public class Neo {
 
             // The sequence here is: start batch inserter, import file, shutdown batch inserter, start database, reindex, shutdown database 
             OSMImporter importer = new OSMImporter(layerName, new ConsoleListener());
-            importer.setCharset(Charset.forName("UTF-8"));
+            //importer.setCharset(Charset.forName("UTF-8"));
 
             BatchInserterImpl inserter = new BatchInserterImpl(dbPath.toString());
             importer.importFile(inserter, osmfile, false);
 
             inserter.getGraphDbService().shutdown();
             graphService = new EmbeddedGraphDatabase(dbPath.toString(), mapConfig);
-            importer.reIndex(graphService, 5000, false, false);
+            importer.reIndex(graphService, 5000, true, false);
             Stop();
             Start();
 
-            results = results + "<br>" + Tools.printDatabaseStats(osmLayer());
+            results = results + "<br>" + OSMStats.printDatabaseStats(osmLayer());
             return results;
         }
     }
@@ -255,12 +247,6 @@ public class Neo {
             results = results + "<br>Node id is: " + pipeFlow.getId();
             results = results + "<br>Nearest neighbor coordinates: " + pipeFlow.getGeometry().getCoordinate().toString();
 
-            for (String prop : pipeFlow.getPropertyNames()) {
-                if (pipeFlow.getProperty(prop) != null) {
-                    System.out.println("\t" + prop + ":" + pipeFlow.getProperty(prop));
-                }
-            }
-
             long stop = System.currentTimeMillis();
             results = results + "<br>Operation took: " + (stop - start) + "ms";
             results = results + "<br>-----";
@@ -272,17 +258,26 @@ public class Neo {
         if (isRunning == false) {
             return "You have to start the database first.";
         }
+        
         String results = "<i>Bouding box results:</i>";
         for (int i = 0; i < coords.length; i++) {
             long start = System.currentTimeMillis();
             long stop;
             Envelope bbox = new Envelope(coords[i][0], coords[i][2], coords[i][3], coords[i][1]); // double minx, double maxx, double miny, double maxy
             if (exportimg == true) {
-                OSMExports.exportImageSnippet(graphService, OSMTests.findGeometriesInLayer(osmLayer(), bbox), osmLayer().getName() + "_" + bbox.toString());
+                com.vividsolutions.jts.geom.Envelope jbbox = Utilities.fromNeo4jToJts(bbox);
+
+                OSMExports.exportImageSnippet(
+                        graphService,
+                        OSMGeoPipeline.startWithinSearch(osmLayer(), 
+                        osmLayer().getGeometryFactory().toGeometry(jbbox)),
+                        osmLayer().getName() + "_" + bbox.toString());
+                
+                //OSMExports.exportImageSnippet(graphService, OSMTests.findGeometriesInLayer(osmLayer(), bbox), osmLayer().getName() + "_" + bbox.toString());
                 stop = System.currentTimeMillis();
                 results = results + "<br>Exported image to file: " + osmLayer().getName() + "_" + bbox.toString();
             } else {
-                results = results + "<br>Found geometries: " + OSMTests.findGeometriesInLayer(osmLayer(), bbox).toNodeList().size();
+                results = results + "<br>Found geometries: " + OSMTests.findGeometriesInLayer(osmLayer(), bbox).count();
                 stop = System.currentTimeMillis();
             }
             results = results + "<br>Operation took: " + (stop - start) + "ms";
@@ -350,34 +345,35 @@ public class Neo {
 
         //DynamicLayerConfig routelayer = osmLayer().addLayerConfig("routelines", 2, "highway is not null and geometryType(the_geom) = 'LineString'");
         //findGeometriesInLayer(routelayer, bbox, true);
-
-        NetworkGenerator networkGenerator;
+        
+        NetworkGenerator networkGenerator = null;
 
         Transaction tx = graphService.beginTx();
-
-        // create Network Points Layer
-        EditableLayer netPointsLayer = spatialService.getOrCreateEditableLayer(osmLayer().getName() + " - network points");
-        netPointsLayer.setCoordinateReferenceSystem(osmLayer().getCoordinateReferenceSystem());
-
-        // create Network Edges Layer
-        EditableLayer netEdgesLayer = spatialService.getOrCreateEditableLayer(osmLayer().getName() + " - network edges");
-        netEdgesLayer.setCoordinateReferenceSystem(osmLayer().getCoordinateReferenceSystem());
-
-        //Integer geomType = osmLayer().getGeometryType();
-        networkGenerator = new NetworkGenerator(netPointsLayer, netEdgesLayer, 0.005); // Find nodes within 2 meter distance
-
-        tx.success();
-        tx.finish();
-
-
         try {
             // new SearchAll()
-            List<SpatialDatabaseRecord> list = OSMGeoPipeline.startOsm(osmLayer()).cqlFilter("highway is not null and highway not in ('cycleway','footway','pedestrain','service') and geometryType(the_geom) = 'LineString'") //.cqlFilter("highway is not null and geometryType(the_geom) = 'LineString'")
+            List<SpatialDatabaseRecord> list = OSMGeoPipeline
+                    .startOsm(osmLayer())
+                    .cqlFilter("highway is not null and highway not in ('cycleway','footway','pedestrain','service') and the_geom IS NOT NULL and geometryType(the_geom) = 'LineString'") 
+                    //.cqlFilter("highway is not null and geometryType(the_geom) = 'LineString'")
                     .toSpatialDatabaseRecordList();
 
             int listCount = list.size();
             System.out.println("Found highway linestrings: " + listCount);
             results = results + "<br>Found highway linestrings: " + listCount;
+
+            // create Network Points Layer
+            EditableLayer netPointsLayer = spatialService.getOrCreateEditableLayer(osmLayer().getName() + " - network points");
+            netPointsLayer.setCoordinateReferenceSystem(osmLayer().getCoordinateReferenceSystem());
+
+            // create Network Edges Layer
+            EditableLayer netEdgesLayer = spatialService.getOrCreateEditableLayer(osmLayer().getName() + " - network edges");
+            netEdgesLayer.setCoordinateReferenceSystem(osmLayer().getCoordinateReferenceSystem());
+
+            //Integer geomType = osmLayer().getGeometryType();
+            networkGenerator = new NetworkGenerator(netPointsLayer, netEdgesLayer, 0.002); // Find nodes within 2 meter distance
+
+            tx.success();
+            tx.finish();
 
             Iterator<SpatialDatabaseRecord> it = list.iterator();
             while (it.hasNext()) {
@@ -399,8 +395,8 @@ public class Neo {
             return (ex.toString());
         } finally {
             System.out.println("Finished created network linestrings, created " + networkGenerator.edgePointCounter() + " edgepoints");
-        }
-        results = results + "<br>Finished created network linestrings, created " + networkGenerator.edgePointCounter() + " edgepoints";
+            results = results + "<br>Finished created network linestrings, created " + networkGenerator.edgePointCounter() + " edgepoints";
+        }        
         return results;
     }
 

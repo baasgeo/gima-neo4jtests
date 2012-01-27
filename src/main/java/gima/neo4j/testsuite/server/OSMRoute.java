@@ -90,18 +90,18 @@ public class OSMRoute {
         Node node = nodeList.iterator().next();
 
         if (store) {
-        GraphDatabaseService databaseService = spatialDatabaseService.getDatabase();
-        Transaction tx = databaseService.beginTx();
-        try {
-            EditableLayer layer = spatialDatabaseService.getOrCreateEditableLayer(pointsLayer.getName() + " - foundpoints");
-            layer.setCoordinateReferenceSystem(pointsLayer.getCoordinateReferenceSystem());
-            layer.add(node);
-            tx.success();
-        } catch (Exception e) {
-            System.out.println(e.getMessage());
-        } finally {
-            tx.finish();
-        }
+            GraphDatabaseService databaseService = spatialDatabaseService.getDatabase();
+            Transaction tx = databaseService.beginTx();
+            try {
+                EditableLayer layer = spatialDatabaseService.getOrCreateEditableLayer(pointsLayer.getName() + " - foundpoints");
+                layer.setCoordinateReferenceSystem(pointsLayer.getCoordinateReferenceSystem());
+                layer.add(node);
+                tx.success();
+            } catch (Exception e) {
+                System.out.println(e.getMessage());
+            } finally {
+                tx.finish();
+            }
         }
         System.out.println("\tGot nearby node: " + node.getId());
         long stop = System.currentTimeMillis();

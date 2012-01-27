@@ -61,6 +61,6 @@ public class Messages {
   public static enum Db {
       MEDEMBLIK,
       AMSTERDAM,
-      NL
+      NH
   }
 }

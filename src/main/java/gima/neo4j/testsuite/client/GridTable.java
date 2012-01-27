@@ -21,26 +21,22 @@ import gima.neo4j.testsuite.shared.Messages;
  *
  * @author bartbaas
  */
-public class TableNetherlands extends Grid {
+public class GridTable extends Grid {
 
     private boolean store = false;
     private ScrollPanel scrollPanel = new ScrollPanel();
     private HTML log = new HTML();
     private GwtMessages messages;
-    private String name = "Netherlands";
-    private String description = "Spatial tests on Open Street Map data from the Netherlands area";
-    private Messages.Db db = Messages.Db.NL;
     
-    private double[][] routes = {{4.8949, 52.3692, 4.8594, 52.3576},
-                                 {4.8799, 52.3931, 4.8954, 52.3996},
-                                 {4.8339, 52.3539, 4.9465, 52.3973},
-                                 {4.9217, 52.3602, 4.9412, 52.3302}};
+    public String name;
+    public String description;
+    public Messages.Db db;
     
-    private double[][] bboxes = {{4.88557, 52.37674, 4.91214, 52.36694},  //Centre of Amsterdam
-                                 {4.84779, 52.37478, 4.86592, 52.36498},  //Old West
-                                 {4.94322, 52.34834, 4.96767, 52.33037}}; 
+    public double[][] routes;    
+    public double[][] bboxes;    
+    public double[][] points;
 
-    public TableNetherlands() {
+    public GridTable() {
         this.messages = new GwtMessages(scrollPanel, log);
         this.resize(8, 4);
     }
@@ -105,7 +101,7 @@ public class TableNetherlands extends Grid {
             }
         });
         this.setWidget(4, 0, btnDelete1);
-        
+
         Label lblDelete1 = new Label(Constants.Labels.DELETE);
         lblDelete1.setStyleName(Constants.Style.SUMMARY);
         this.setWidget(4, 1, lblDelete1);
@@ -119,7 +115,7 @@ public class TableNetherlands extends Grid {
         btnImport1.addClickHandler(new ClickHandler() {
 
             public void onClick(ClickEvent event) {
-                messages.SendMessage(Messages.Type.MAKE_OSM, db);
+                messages.SendMessage(Messages.Type.MAKE_OSM, db, store);
             }
         });
         this.setWidget(6, 0, btnImport1);
@@ -176,7 +172,7 @@ public class TableNetherlands extends Grid {
         btnTest2.addClickHandler(new ClickHandler() {
 
             public void onClick(ClickEvent event) {
-                messages.SendMessage(Messages.Type.TEST_EXPORTLAYERS, db);
+                messages.SendMessage(Messages.Type.TEST_CLOSEPOINT, db, points);
             }
         });
         this.setWidget(3, 2, btnTest2);

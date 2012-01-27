@@ -18,7 +18,7 @@ public class GwtServiceImpl extends RemoteServiceServlet implements GwtService {
     private static File basePath = new File(System.getProperty("user.home") + "/data/neodb");
     private Neo medemblikDb = new Neo();
     private Neo amsterdamDb = new Neo();
-    private Neo nlDb = new Neo();
+    private Neo nhDb = new Neo();
 
     public String SendTask(Messages.Type type, Messages.Db db, double[][] obj, boolean store) {
 
@@ -39,14 +39,14 @@ public class GwtServiceImpl extends RemoteServiceServlet implements GwtService {
                     amsterdamDb.mapConfig = Neo.NORMAL_CONFIG;
                 }
                 return SendOperation(amsterdamDb, type, obj, store);
-            case NL:
-                if (!nlDb.isRunning()) {
-                    nlDb.layerName = "Netherlands";
-                    nlDb.dbPath = new File(basePath, "netherlands.gdb");
-                    nlDb.osmfile = (System.getProperty("user.home") + "/data/osm/netherlands.osm");
-                    nlDb.mapConfig = Neo.LARGE_CONFIG;
+            case NH:
+                if (!nhDb.isRunning()) {
+                    nhDb.layerName = "North-Holland";
+                    nhDb.dbPath = new File(basePath, "north-holland.gdb");
+                    nhDb.osmfile = (System.getProperty("user.home") + "/data/osm/north-holland.osm");
+                    nhDb.mapConfig = Neo.LARGE_CONFIG;
                 }
-                return SendOperation(nlDb, type, obj, store);
+                return SendOperation(nhDb, type, obj, store);
             default:
                 return "<div class=red>Database not found.</red>";
         }
@@ -70,9 +70,9 @@ public class GwtServiceImpl extends RemoteServiceServlet implements GwtService {
                     return instance.DoTests();
                 case MAKE_OSM:
                     if (store) {
-                        return instance.ImportOSM_Batch();
-                    } else {
                         return instance.ImportOSM();
+                    } else {
+                        return instance.ImportOSM_Batch();
                     }
                 case MAKE_NETWORK:
                     return instance.MakeTopology();

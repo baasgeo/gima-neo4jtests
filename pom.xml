@@ -88,8 +88,8 @@
             <groupId>org.neo4j</groupId>
             <artifactId>neo4j-spatial</artifactId>
             <version>${neo4j.spatial.version}</version>
-            <scope>system</scope>
-            <systemPath>${basedir}/src/main/resources/neo4j-spatial/neo4j-spatial-0.7-SNAPSHOT.jar</systemPath>
+            <!--scope>system</scope>
+            <systemPath>${basedir}/src/main/resources/neo4j-spatial/neo4j-spatial-0.7-SNAPSHOT.jar</systemPath-->
         </dependency>
         <dependency>
             <groupId>org.geotools</groupId>

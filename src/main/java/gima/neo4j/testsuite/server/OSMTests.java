@@ -13,10 +13,14 @@ import org.geotools.data.DataStore;
 import org.geotools.data.neo4j.Neo4jSpatialDataStore;
 import org.geotools.data.simple.SimpleFeatureCollection;
 import org.geotools.data.simple.SimpleFeatureSource;
+import org.neo4j.collections.rtree.filter.SearchFilter;
 import org.neo4j.gis.spatial.Layer;
+import org.neo4j.gis.spatial.LayerIndexReader;
 import org.neo4j.gis.spatial.SpatialDatabaseRecord;
 import org.neo4j.gis.spatial.SpatialRelationshipTypes;
 import org.neo4j.gis.spatial.Utilities;
+import org.neo4j.gis.spatial.filter.SearchIntersectWindow;
+import org.neo4j.gis.spatial.filter.SearchRecords;
 import org.neo4j.gis.spatial.osm.OSMDataset;
 import org.neo4j.gis.spatial.osm.OSMDataset.Way;
 import org.neo4j.gis.spatial.osm.OSMLayer;
@@ -59,22 +63,60 @@ public class OSMTests {
     }
 
     public static GeoPipeFlow findClosestNode(Coordinate coordinate, Layer layer) {
-        GeoPipeline pipe = GeoPipeline.startNearestNeighborLatLonSearch(layer, coordinate, 0.5)
+        GeoPipeline pipe = GeoPipeline
+                .startNearestNeighborLatLonSearch(layer, coordinate, 10)
                 .sort("OrthodromicDistance")
                 .getMin("OrthodromicDistance")
                 .copyDatabaseRecordProperties();
         List<GeoPipeFlow> closests = pipe.toList();
         //System.out.println("Found close node at distance: " + closests.get(0).getProperty("OrthodromicDistance"));
         //System.out.println("Coordinates are: " + closests.get(0).getGeometry().getCoordinate().toString());
+        //for (String prop : pipeFlow.getPropertyNames()) {
+        //    if (pipeFlow.getProperty(prop) != null) {
+        //        System.out.println("\t" + prop + ":" + pipeFlow.getProperty(prop));
+        //    }
+        //}
 
         return closests.get(0);
     }
-    
+
     public static GeoPipeline findGeometriesInLayer(Layer layer, org.neo4j.collections.rtree.Envelope envelope) {
         com.vividsolutions.jts.geom.Envelope bbox = Utilities.fromNeo4jToJts(envelope);
         // TODO why a SearchWithin and not a SearchIntersectWindow?
         //return GeoPipeline.startWithinSearch(layer, layer.getGeometryFactory().toGeometry(envelope)).toNodeList();
-        GeoPipeline pipeline = GeoPipeline.startWithinSearch(layer, layer.getGeometryFactory().toGeometry(bbox));
+        GeoPipeline pipeline = OSMGeoPipeline.startWithinSearch(layer, layer.getGeometryFactory().toGeometry(bbox)).getGeometryType();
+        GeoPipeline pipeline2 = OSMGeoPipeline.startOsm(layer)
+                .withinFilter(layer.getGeometryFactory().toGeometry(bbox))
+                .getGeometryType();
+        
+        //print(pipeline2);
+        //GeometryType = LineString, Point, Polygon
+        
+        int numLine = 0;
+        int numPoint = 0;
+        int numPoly = 0;
+        int numTotal = 0;
+
+        for (GeoPipeFlow flow : pipeline2) {
+            if (flow.getProperties().get("GeometryType") == "LineString") {
+                Geometry geometry = flow.getGeometry();
+                numLine++;
+            } else if (flow.getProperties().get("GeometryType") == "Point") {
+                numPoint++;
+            } else if (flow.getProperties().get("GeometryType") == "Polygon") {
+                numPoint++;
+            } else {
+                System.out.println(flow.getProperties().get("GeometryType"));
+            }
+            numTotal++;
+        }
+        System.out.println("Lines: " + numLine + ", Points: " + numPoint + ", Polygons: " + numPoly + ", Total: " + numTotal);
+
+        //SearchFilter filter = new SearchIntersectWindow( layer, bbox );
+        //LayerIndexReader index = layer.getIndex();
+        //SearchRecords search = index.search(filter);
+        //System.out.println("Index found: " + search.count());
+
         return pipeline;
     }
 
@@ -115,5 +157,15 @@ public class OSMTests {
         //TODO fix this...
         //System.out.println("Layer '" + layer.getName() + "' has " + features.size() + " features");
         //assertEquals("FeatureCollection.size for layer '" + layer.getName() + "' not the same as index count", layer.getIndex().count(), features.size());
+    }
+
+    private static void print(GeoPipeline pipeline) {
+        for (GeoPipeFlow flow : pipeline) {
+            System.out.println("GeoPipeFlow:");
+            for (String key : flow.getProperties().keySet()) {
+                System.out.println(key + "=" + flow.getProperties().get(key));
+            }
+            System.out.println("-");
+        }
     }
 }

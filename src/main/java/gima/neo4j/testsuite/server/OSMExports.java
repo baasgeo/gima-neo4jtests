@@ -26,6 +26,7 @@ import org.geotools.styling.Style;
 import org.neo4j.collections.rtree.filter.SearchAll;
 import org.neo4j.gis.spatial.Layer;
 import org.neo4j.gis.spatial.SpatialDatabaseService;
+import org.neo4j.gis.spatial.Utilities;
 import org.neo4j.gis.spatial.pipes.GeoPipeFlow;
 import org.neo4j.gis.spatial.pipes.GeoPipeline;
 import org.neo4j.gis.spatial.pipes.osm.OSMGeoPipeline;
@@ -38,15 +39,6 @@ import org.opengis.feature.simple.SimpleFeatureType;
  * @author bartbaas
  */
 public class OSMExports extends OSMTests {
-    // OpenGIS geometry type numbers 
-
-    static int GTYPE_GEOMETRY = 0;
-    static int GTYPE_POINT = 1;
-    static int GTYPE_LINESTRING = 2;
-    static int GTYPE_POLYGON = 3;
-    static int GTYPE_MULTIPOINT = 4;
-    static int GTYPE_MULTILINESTRING = 5;
-    static int GTYPE_MULTIPOLYGON = 6;
 
     public static void addDynamicLayers(GraphDatabaseService graphDb, OSMLayer osmLayer) {
         Envelope bbox = osmLayer.getIndex().getBoundingBox();
@@ -61,9 +53,12 @@ public class OSMExports extends OSMTests {
                     new Coordinate(bbox.getMaxX(), bbox.getMaxY()), new Coordinate(bbox.getMaxX(), bbox.getMinY()),
                     new Coordinate(bbox.getMinX(), bbox.getMinY())});
         //Polygon polygon = osmLayer.getGeometryFactory().createPolygon(ring, null);
-        layers.add(osmLayer.addLayerConfig("CQL1-highway", GTYPE_LINESTRING, "highway is not null and geometryType(the_geom) = 'LineString'"));
-        layers.add(osmLayer.addLayerConfig("CQL2-residential", GTYPE_LINESTRING, "highway = 'residential' and geometryType(the_geom) = 'LineString'"));
-        layers.add(osmLayer.addLayerConfig("CQL3-natural", GTYPE_POLYGON, "natural is not null and geometryType(the_geom) = 'Polygon'"));
+        layers.add(osmLayer.addLayerConfig("CQL1-highway", Constants.GTYPE_LINESTRING, "highway is not null and geometryType(the_geom) = 'LineString'"));
+        layers.add(osmLayer.addLayerConfig("CQL2-residential", Constants.GTYPE_LINESTRING, "highway = 'residential' and geometryType(the_geom) = 'LineString'"));
+        layers.add(osmLayer.addLayerConfig("CQL3-natural", Constants.GTYPE_POLYGON, "natural is not null and geometryType(the_geom) = 'Polygon'"));
+        layers.add(osmLayer.addSimpleDynamicLayer("natural", "water", Constants.GTYPE_POLYGON));
+        layers.add(osmLayer.addSimpleDynamicLayer("natural", "wood", Constants.GTYPE_POLYGON));
+        layers.add(osmLayer.addSimpleDynamicLayer(Constants.GTYPE_POLYGON));
         /**layers.add(osmLayer.addLayerConfig("CQL4-water", GTYPE_POLYGON, "natural = 'water' and geometryType(the_geom) = 'Polygon'"));
         layers.add(osmLayer.addLayerConfig("CQL5-bbox", GTYPE_GEOMETRY, "BBOX(the_geom, " + toCoordinateText(bbox) + ")"));
         layers.add(osmLayer.addLayerConfig("CQL6-bbox-polygon", GTYPE_GEOMETRY, "within(the_geom, POLYGON(("
@@ -88,8 +83,6 @@ public class OSMExports extends OSMTests {
         layers.add(osmLayer.addSimpleDynamicLayer("building", null, GTYPE_POLYGON));
         layers.add(osmLayer.addCQLDynamicLayerOnAttribute("building", null, GTYPE_POLYGON));
         layers.add(osmLayer.addSimpleDynamicLayer("natural", null, GTYPE_GEOMETRY));
-        layers.add(osmLayer.addSimpleDynamicLayer("natural", "water", GTYPE_POLYGON));
-        layers.add(osmLayer.addSimpleDynamicLayer("natural", "wood", GTYPE_POLYGON));
         layers.add(osmLayer.addSimpleDynamicLayer("natural", "coastline"));
         layers.add(osmLayer.addSimpleDynamicLayer("natural", "beach"));
         layers.add(osmLayer.addSimpleDynamicLayer(GTYPE_POLYGON));
@@ -100,10 +93,6 @@ public class OSMExports extends OSMTests {
     }
 
     public static void exportImages(GraphDatabaseService graphDb, OSMLayer osmLayer, ArrayList<Layer> layers) {
-        com.vividsolutions.jts.geom.Envelope bbox =
-                new com.vividsolutions.jts.geom.Envelope(4.88557, 4.91214, 52.36694, 52.37674); //(52.3239294585924, 52.4278631370635, 4.8246131377312, 4.98776905827439); 
-        //double minx, double maxx, double miny, double maxy
-
         StyledImageExporter imageExporter = new StyledImageExporter(graphDb);
         imageExporter.setExportDir(System.getProperty("user.home") + "/data/export/" + osmLayer.getName());
         imageExporter.setZoom(5.0);
@@ -116,13 +105,15 @@ public class OSMExports extends OSMTests {
         int countMultiGeometryLayers = 0;
         int countMultiGeometryExceptions = 0;
         for (Layer layer : layers) {
-            // for (Layer layer : new Layer[] {}) {
-            if (layer.getGeometryType() == GTYPE_GEOMETRY) {
+            
+            com.vividsolutions.jts.geom.Envelope boundingBox = Utilities.fromNeo4jToJts(layer.getIndex().getBoundingBox());
+            
+            if (layer.getGeometryType() == Constants.GTYPE_GEOMETRY) {
                 countMultiGeometryLayers++;
             }
 
             try {
-                imageExporter.saveLayerImage(layer.getName(), null, new File(layer.getName() + ".png"), ReferencedEnvelope.reference(bbox));
+                imageExporter.saveLayerImage(layer.getName(), null, new File(layer.getName() + ".png"), ReferencedEnvelope.reference(boundingBox));
                 //imageExporter.saveLayerImage(layer.getName());
                 //imageExporter.saveLayerImage(layer.getName(), null);
 
@@ -141,11 +132,10 @@ public class OSMExports extends OSMTests {
     public static void exportImageSnippet(GraphDatabaseService graphDb, GeoPipeline pipeline, String imgName) {
         try {
             //FeatureCollection layerCollection = GeoPipeline.start(layer, new SearchAll()).toFeatureCollection();
-            FeatureCollection pipelineCollection;
-            pipelineCollection = pipeline.toFeatureCollection();
+            FeatureCollection pipelineCollection = pipeline.toFeatureCollection();
 
-            ReferencedEnvelope bounds = pipelineCollection.getBounds();
-            bounds.expandToInclude(pipelineCollection.getBounds());
+            //ReferencedEnvelope bounds = pipelineCollection.getBounds();
+            //bounds.expandToInclude(pipelineCollection.getBounds());
             //bounds.expandBy(boundsDelta, boundsDelta);
 
             StyledImageExporter exporter = new StyledImageExporter(graphDb);
