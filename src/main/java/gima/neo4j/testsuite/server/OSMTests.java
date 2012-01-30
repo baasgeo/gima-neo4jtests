@@ -91,26 +91,6 @@ public class OSMTests {
         
         //print(pipeline2);
         //GeometryType = LineString, Point, Polygon
-        
-        int numLine = 0;
-        int numPoint = 0;
-        int numPoly = 0;
-        int numTotal = 0;
-
-        for (GeoPipeFlow flow : pipeline2) {
-            if (flow.getProperties().get("GeometryType") == "LineString") {
-                Geometry geometry = flow.getGeometry();
-                numLine++;
-            } else if (flow.getProperties().get("GeometryType") == "Point") {
-                numPoint++;
-            } else if (flow.getProperties().get("GeometryType") == "Polygon") {
-                numPoint++;
-            } else {
-                System.out.println(flow.getProperties().get("GeometryType"));
-            }
-            numTotal++;
-        }
-        System.out.println("Lines: " + numLine + ", Points: " + numPoint + ", Polygons: " + numPoly + ", Total: " + numTotal);
 
         //SearchFilter filter = new SearchIntersectWindow( layer, bbox );
         //LayerIndexReader index = layer.getIndex();

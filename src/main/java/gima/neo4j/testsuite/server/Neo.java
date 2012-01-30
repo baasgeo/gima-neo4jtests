@@ -235,7 +235,7 @@ public class Neo {
         if (isRunning == false) {
             return "You have to start the database first.";
         }
-        String results = "<i>Bouding box results:</i>";
+        String results = "<i>Bouding box results for " + layerName + ":</i>";
         for (int i = 0; i < coords.length; i++) {
             long start = System.currentTimeMillis();
 
@@ -258,26 +258,43 @@ public class Neo {
         if (isRunning == false) {
             return "You have to start the database first.";
         }
-        
-        String results = "<i>Bouding box results:</i>";
+
+        String results = "<i>Bouding box results for " + layerName + ":</i>";
         for (int i = 0; i < coords.length; i++) {
             long start = System.currentTimeMillis();
             long stop;
             Envelope bbox = new Envelope(coords[i][0], coords[i][2], coords[i][3], coords[i][1]); // double minx, double maxx, double miny, double maxy
             if (exportimg == true) {
-                com.vividsolutions.jts.geom.Envelope jbbox = Utilities.fromNeo4jToJts(bbox);
-
-                OSMExports.exportImageSnippet(
-                        graphService,
-                        OSMGeoPipeline.startWithinSearch(osmLayer(), 
-                        osmLayer().getGeometryFactory().toGeometry(jbbox)),
-                        osmLayer().getName() + "_" + bbox.toString());
-                
-                //OSMExports.exportImageSnippet(graphService, OSMTests.findGeometriesInLayer(osmLayer(), bbox), osmLayer().getName() + "_" + bbox.toString());
+                OSMExports.exportImageSnippet(graphService, OSMTests.findGeometriesInLayer(osmLayer(), bbox), osmLayer().getName() + "_" + bbox.toString());
                 stop = System.currentTimeMillis();
                 results = results + "<br>Exported image to file: " + osmLayer().getName() + "_" + bbox.toString();
             } else {
-                results = results + "<br>Found geometries: " + OSMTests.findGeometriesInLayer(osmLayer(), bbox).count();
+                int numLine = 0;
+                int numPoint = 0;
+                int numPoly = 0;
+                int numTotal = 0;
+
+                for (GeoPipeFlow flow : OSMTests.findGeometriesInLayer(osmLayer(), bbox)) {
+                    if (flow.getProperties().get("GeometryType") == "LineString") {
+                        numLine++;
+                    } else if (flow.getProperties().get("GeometryType") == "Point") {
+                        numPoint++;
+                    } else if (flow.getProperties().get("GeometryType") == "Polygon") {
+                        numPoint++;
+                    } else {
+                        System.out.println(flow.getProperties().get("GeometryType"));
+                    }
+                    numTotal++;
+                }
+                results = results 
+                        + "<br>" + bbox.toString() 
+                        + "<br>Found geometries in bounding box: "
+                        + "<br>Lines: " + numLine 
+                        + "<br>Points: " + numPoint 
+                        + "<br>Polygons: " + numPoly 
+                        + "<br>Total: " + numTotal;
+
+                //results = results + "<br>Found geometries: " + OSMTests.findGeometriesInLayer(osmLayer(), bbox).count();
                 stop = System.currentTimeMillis();
             }
             results = results + "<br>Operation took: " + (stop - start) + "ms";
@@ -308,7 +325,7 @@ public class Neo {
     }
 
     public String ShortestPath(double[][] routes, boolean storeRoute) {
-        String results = "<i>Routing results:</i>";
+        String results = "<i>Routing results for " + layerName + ":</i>";
 
         Layer points = spatialService.getLayer(osmLayer().getName() + " - network points");
 
@@ -333,7 +350,7 @@ public class Neo {
     }
 
     public String MakeTopology() {
-        String results = "<i>Creating routing network:</i>";
+        String results = "<i>Creating routing network for " + layerName + ":</i>";
         try {
             System.out.println("Deleting layers...");
             osmLayer().removeDynamicLayer("routelines");
@@ -345,16 +362,13 @@ public class Neo {
 
         //DynamicLayerConfig routelayer = osmLayer().addLayerConfig("routelines", 2, "highway is not null and geometryType(the_geom) = 'LineString'");
         //findGeometriesInLayer(routelayer, bbox, true);
-        
+
         NetworkGenerator networkGenerator = null;
 
         Transaction tx = graphService.beginTx();
         try {
             // new SearchAll()
-            List<SpatialDatabaseRecord> list = OSMGeoPipeline
-                    .startOsm(osmLayer())
-                    .cqlFilter("highway is not null and highway not in ('cycleway','footway','pedestrain','service') and the_geom IS NOT NULL and geometryType(the_geom) = 'LineString'") 
-                    //.cqlFilter("highway is not null and geometryType(the_geom) = 'LineString'")
+            List<SpatialDatabaseRecord> list = OSMGeoPipeline.startOsm(osmLayer()).cqlFilter("highway is not null and highway not in ('cycleway','footway','pedestrain','service') and the_geom IS NOT NULL and geometryType(the_geom) = 'LineString'") //.cqlFilter("highway is not null and geometryType(the_geom) = 'LineString'")
                     .toSpatialDatabaseRecordList();
 
             int listCount = list.size();
@@ -396,7 +410,7 @@ public class Neo {
         } finally {
             System.out.println("Finished created network linestrings, created " + networkGenerator.edgePointCounter() + " edgepoints");
             results = results + "<br>Finished created network linestrings, created " + networkGenerator.edgePointCounter() + " edgepoints";
-        }        
+        }
         return results;
     }
 
