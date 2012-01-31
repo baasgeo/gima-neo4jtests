@@ -338,6 +338,7 @@ public class Neo {
             osmRoute.RouteLayerName(osmLayer().getName() + " - Route" + i);
             results = results + "<br>Found nearby startnode: " + osmRoute.StartNodeId() + " for " + startCoord.toString();
             results = results + "<br>Found nearby endnode: " + osmRoute.EndNodeId() + " for " + endCoord.toString();
+            results = results + "<br>Node search time: " + osmRoute.NodeSearchTime()+ "ms";
             results = results + "<br>" + osmRoute.dijkstra();
             if (storeRoute) {
                 results = results + "<br>Route is stored in layer: " + osmLayer().getName() + " - Route" + i;

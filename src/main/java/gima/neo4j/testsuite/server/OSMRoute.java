@@ -11,26 +11,16 @@ import org.neo4j.gis.spatial.EditableLayer;
 import org.neo4j.gis.spatial.Layer;
 import org.neo4j.gis.spatial.SpatialDatabaseService;
 import org.neo4j.gis.spatial.SpatialRelationshipTypes;
-import org.neo4j.gis.spatial.SpatialTopologyUtils;
-import org.neo4j.gis.spatial.osm.OSMRelation;
-import org.neo4j.gis.spatial.pipes.GeoPipeFlow;
 import org.neo4j.gis.spatial.pipes.GeoPipeline;
-import org.neo4j.graphalgo.CommonEvaluators;
 import org.neo4j.graphalgo.CostEvaluator;
-import org.neo4j.graphalgo.EstimateEvaluator;
-import org.neo4j.graphalgo.GraphAlgoFactory;
-import org.neo4j.graphalgo.PathFinder;
-import org.neo4j.graphalgo.WeightedPath;
 import org.neo4j.graphalgo.impl.shortestpath.Dijkstra;
 import org.neo4j.graphalgo.impl.util.DoubleAdder;
 import org.neo4j.graphalgo.impl.util.DoubleComparator;
 import org.neo4j.graphdb.Direction;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
-import org.neo4j.graphdb.PropertyContainer;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.Transaction;
-import org.neo4j.kernel.Traversal;
 
 /**
  *
@@ -45,6 +35,7 @@ public class OSMRoute {
     private boolean store = false;
     private Node startNode = null;
     private Node endNode = null;
+    private long nodeSearchTime = 0;
 
     public void dispose() {
     }
@@ -76,6 +67,10 @@ public class OSMRoute {
     public long EndNodeId() {
         return endNode.getId();
     }
+    
+    public long NodeSearchTime() {
+        return nodeSearchTime;
+    }
 
     private Node getNode(Coordinate coordinate) {
         long start = System.currentTimeMillis();
@@ -88,6 +83,8 @@ public class OSMRoute {
                 .toNodeList();
 
         Node node = nodeList.iterator().next();
+        long stop = System.currentTimeMillis();
+        nodeSearchTime = nodeSearchTime + (stop - start);
 
         if (store) {
             GraphDatabaseService databaseService = spatialDatabaseService.getDatabase();
@@ -103,17 +100,14 @@ public class OSMRoute {
                 tx.finish();
             }
         }
-        System.out.println("\tGot nearby node: " + node.getId());
-        long stop = System.currentTimeMillis();
-        System.out.println("\tFound " + " item in " + (stop - start) + "ms");
-
+        System.out.println("\tGot nearby node: " + node.getId());        
+        System.out.println("\tFound " + " item in " + (stop - start) + "ms");        
+        
         return node;
     }
 
     public String dijkstra() {
-
         String result;
-
         System.out.println(routeLayerName);
         
         GraphDatabaseService databaseService = spatialDatabaseService.getDatabase();
@@ -144,10 +138,10 @@ public class OSMRoute {
                     SpatialRelationshipTypes.NETWORK);
 
             List<Node> pathNodes = sp.getPathAsNodes();
-            
+
             System.out.println("Length: " + sp.getCost());
             System.out.println("Segments: " + pathNodes.size());
-            result = "Length: " + sp.getCost() + ", Segments: " + pathNodes.size();
+            result = "Length: " + sp.getCost().longValue() + ", Segments: " + pathNodes.size();
             if (pathNodes != null && store == true) {
                 EditableLayer layer = spatialDatabaseService.getOrCreateEditableLayer(routeLayerName);
                 layer.setCoordinateReferenceSystem(pointsLayer.getCoordinateReferenceSystem());
@@ -167,41 +161,5 @@ public class OSMRoute {
             tx.finish();
         }
         return result;
-    }
-
-    public void dijkstra2() {
-        // START SNIPPET: dijkstraUsage
-        PathFinder<WeightedPath> finder = GraphAlgoFactory.dijkstra(
-                Traversal.expanderForTypes(OSMRelation.WAYS, Direction.BOTH), "length");
-        WeightedPath path = finder.findSinglePath(startNode, endNode);
-
-        // Get the weight for the found path
-        System.out.println("Dijkstra weight: " + path.weight() + ", Dijkstra length: " + path.length());
-    }
-
-    public void astar() {
-        GraphDatabaseService databaseService = spatialDatabaseService.getDatabase();
-        Transaction tx = databaseService.beginTx();
-        try {
-            EstimateEvaluator<Double> estimateEvaluator = new EstimateEvaluator<Double>() {
-
-                public Double getCost(final Node node, final Node goal) {
-                    return (Double) node.getProperty("_distance");
-                }
-            };
-            PathFinder<WeightedPath> astar = GraphAlgoFactory.aStar(
-                    Traversal.expanderForTypes(SpatialRelationshipTypes.NETWORK, Direction.BOTH),
-                    CommonEvaluators.doubleCostEvaluator("_distance"),
-                    estimateEvaluator);
-
-            WeightedPath path = astar.findSinglePath(startNode, endNode);
-            System.out.println("A-star weight: " + path.weight());
-            tx.success();
-        } catch (Exception e) {
-            System.out.println(e.getMessage());
-            System.out.println("Error finding Path, Unable to find Path");
-        } finally {
-            tx.finish();
-        }
     }
 }

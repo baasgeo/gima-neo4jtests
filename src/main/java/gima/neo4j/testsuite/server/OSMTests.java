@@ -13,27 +13,16 @@ import org.geotools.data.DataStore;
 import org.geotools.data.neo4j.Neo4jSpatialDataStore;
 import org.geotools.data.simple.SimpleFeatureCollection;
 import org.geotools.data.simple.SimpleFeatureSource;
-import org.neo4j.collections.rtree.filter.SearchFilter;
 import org.neo4j.gis.spatial.Layer;
-import org.neo4j.gis.spatial.LayerIndexReader;
 import org.neo4j.gis.spatial.SpatialDatabaseRecord;
-import org.neo4j.gis.spatial.SpatialRelationshipTypes;
 import org.neo4j.gis.spatial.Utilities;
-import org.neo4j.gis.spatial.filter.SearchIntersectWindow;
-import org.neo4j.gis.spatial.filter.SearchRecords;
 import org.neo4j.gis.spatial.osm.OSMDataset;
 import org.neo4j.gis.spatial.osm.OSMDataset.Way;
 import org.neo4j.gis.spatial.osm.OSMLayer;
 import org.neo4j.gis.spatial.pipes.GeoPipeFlow;
 import org.neo4j.gis.spatial.pipes.GeoPipeline;
 import org.neo4j.gis.spatial.pipes.osm.OSMGeoPipeline;
-import org.neo4j.graphdb.Direction;
 import org.neo4j.graphdb.GraphDatabaseService;
-import org.neo4j.graphdb.Node;
-import org.neo4j.graphdb.ReturnableEvaluator;
-import org.neo4j.graphdb.StopEvaluator;
-import org.neo4j.graphdb.TraversalPosition;
-import org.neo4j.graphdb.Traverser;
 
 /**
  *

@@ -83,8 +83,6 @@ public class tests implements EntryPoint {
         tableAmsterdam.db = Messages.Db.AMSTERDAM;
         tableAmsterdam.routes = new double[][]{
             {4.8949, 52.3692, 4.8594, 52.3576},
-            {4.8799, 52.3931, 4.8954, 52.3996},
-            {4.8339, 52.3539, 4.9465, 52.3973},
             {4.9217, 52.3602, 4.9412, 52.3302}};
         tableAmsterdam.bboxes = new double[][]{
             {4.88557, 52.37674, 4.91214, 52.36694}, //Centre of Amsterdam
@@ -107,10 +105,13 @@ public class tests implements EntryPoint {
         tableNl.db = Messages.Db.NH;
         tableNl.routes = new double[][]{
             {4.8949, 52.3692, 4.8594, 52.3576},
-            {4.8799, 52.3931, 4.8954, 52.3996},
-            {4.8339, 52.3539, 4.9465, 52.3973},
-            {4.9217, 52.3602, 4.9412, 52.3302}};
+            {4.9217, 52.3602, 4.9412, 52.3302},
+            {4.88557, 52.37674, 4.91214, 52.36694}, //Centre of Amsterdam
+            {5.09060, 52.76522, 4.88557, 52.37674},   //Medemblik to Amsterdam
+            {4.84779, 52.37478, 4.86592, 52.36498}};
         tableNl.bboxes = new double[][]{
+            {5.09623, 52.77227, 5.10315, 52.76724}, //Meerlaan
+            {5.10528, 52.76338, 5.10885, 52.76078},
             {4.88557, 52.37674, 4.91214, 52.36694}, //Centre of Amsterdam
             {4.84779, 52.37478, 4.86592, 52.36498}, //Old West
             {4.94322, 52.34834, 4.96767, 52.33037}};
