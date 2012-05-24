@@ -8,7 +8,6 @@ import java.util.ArrayList;
 
 import org.geotools.data.DataSourceException;
 import org.neo4j.collections.rtree.Envelope;
-import org.neo4j.gis.spatial.osm.OSMLayer;
 
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.LinearRing;
@@ -27,6 +26,7 @@ import org.neo4j.collections.rtree.filter.SearchAll;
 import org.neo4j.gis.spatial.Layer;
 import org.neo4j.gis.spatial.SpatialDatabaseService;
 import org.neo4j.gis.spatial.Utilities;
+import org.neo4j.gis.spatial.osm.OSMLayer;
 import org.neo4j.gis.spatial.pipes.GeoPipeFlow;
 import org.neo4j.gis.spatial.pipes.GeoPipeline;
 import org.neo4j.gis.spatial.pipes.osm.OSMGeoPipeline;
@@ -53,11 +53,13 @@ public class OSMExports extends OSMTests {
                     new Coordinate(bbox.getMaxX(), bbox.getMaxY()), new Coordinate(bbox.getMaxX(), bbox.getMinY()),
                     new Coordinate(bbox.getMinX(), bbox.getMinY())});
         //Polygon polygon = osmLayer.getGeometryFactory().createPolygon(ring, null);
-        layers.add(osmLayer.addLayerConfig("CQL1-highway", Constants.GTYPE_LINESTRING, "highway is not null and geometryType(the_geom) = 'LineString'"));
-        layers.add(osmLayer.addLayerConfig("CQL2-residential", Constants.GTYPE_LINESTRING, "highway = 'residential' and geometryType(the_geom) = 'LineString'"));
-        layers.add(osmLayer.addLayerConfig("CQL3-natural", Constants.GTYPE_POLYGON, "natural is not null and geometryType(the_geom) = 'Polygon'"));
-        layers.add(osmLayer.addSimpleDynamicLayer("natural", "water", Constants.GTYPE_POLYGON));
-        layers.add(osmLayer.addSimpleDynamicLayer("natural", "wood", Constants.GTYPE_POLYGON));
+        //layers.add(osmLayer.addLayerConfig("CQL1-highway", Constants.GTYPE_LINESTRING, "highway is not null and geometryType(the_geom) = 'LineString'"));
+        //layers.add(osmLayer.addLayerConfig("CQL2-residential", Constants.GTYPE_LINESTRING, "highway = 'residential' and geometryType(the_geom) = 'LineString'"));
+        //layers.add(osmLayer.addLayerConfig("CQL3-natural", Constants.GTYPE_POLYGON, "natural is not null and geometryType(the_geom) = 'Polygon'"));
+        //layers.add(osmLayer.addSimpleDynamicLayer("natural", "water", Constants.GTYPE_POLYGON));
+        //layers.add(osmLayer.addSimpleDynamicLayer("natural", "wood", Constants.GTYPE_POLYGON));
+        layers.add(osmLayer.addSimpleDynamicLayer(Constants.GTYPE_POINT));
+        layers.add(osmLayer.addSimpleDynamicLayer(Constants.GTYPE_LINESTRING));
         layers.add(osmLayer.addSimpleDynamicLayer(Constants.GTYPE_POLYGON));
         /**layers.add(osmLayer.addLayerConfig("CQL4-water", GTYPE_POLYGON, "natural = 'water' and geometryType(the_geom) = 'Polygon'"));
         layers.add(osmLayer.addLayerConfig("CQL5-bbox", GTYPE_GEOMETRY, "BBOX(the_geom, " + toCoordinateText(bbox) + ")"));
@@ -89,7 +91,7 @@ public class OSMExports extends OSMTests {
         layers.add(osmLayer.addSimpleDynamicLayer(GTYPE_POINT));
         layers.add(osmLayer.addCQLDynamicLayerOnGeometryType(GTYPE_POLYGON));
         layers.add(osmLayer.addCQLDynamicLayerOnGeometryType(GTYPE_POINT));*/
-        exportImages(graphDb, osmLayer, layers);
+        //exportImages(graphDb, osmLayer, layers);
     }
 
     public static void exportImages(GraphDatabaseService graphDb, OSMLayer osmLayer, ArrayList<Layer> layers) {

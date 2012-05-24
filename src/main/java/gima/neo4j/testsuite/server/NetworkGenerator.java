@@ -88,7 +88,8 @@ public class NetworkGenerator {
                 GeoPipeline.startNearestNeighborLatLonSearch(pointsLayer, edgePoint.getCoordinate(), buffer.doubleValue()) 
                 //.sort("OrthodromicDistance")
                 //.getMin("OrthodromicDistance")
-                .toSpatialDatabaseRecordList().iterator();
+                .toSpatialDatabaseRecordList()
+                .iterator();
 
         //Iterator<SpatialDatabaseRecord> results = pointsLayer.getIndex().search(
         //        new SearchIntersect(pointsLayer, edgePoint));
