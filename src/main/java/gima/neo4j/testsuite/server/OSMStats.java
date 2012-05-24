@@ -4,6 +4,7 @@
  */
 package gima.neo4j.testsuite.server;
 
+import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.GeometryFactory;
 import java.io.File;
 import java.math.BigDecimal;
@@ -11,6 +12,7 @@ import java.util.HashMap;
 import org.geotools.referencing.CRS;
 import org.neo4j.collections.rtree.Envelope;
 import org.neo4j.collections.rtree.filter.SearchAll;
+import org.neo4j.gis.spatial.GeometryEncoder;
 import org.neo4j.gis.spatial.Layer;
 import org.neo4j.gis.spatial.LayerIndexReader;
 import org.neo4j.gis.spatial.SpatialDatabaseRecord;
@@ -18,6 +20,7 @@ import org.neo4j.gis.spatial.SpatialDatabaseService;
 import org.neo4j.gis.spatial.filter.SearchRecords;
 import org.neo4j.gis.spatial.osm.OSMLayer;
 import org.neo4j.graphdb.Node;
+import org.neo4j.graphdb.PropertyContainer;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.kernel.EmbeddedGraphDatabase;
 import org.neo4j.kernel.impl.nioneo.store.PropertyStore;
@@ -70,6 +73,7 @@ public class OSMStats {
         SearchRecords results = layer.getIndex().search(new SearchAll());
 
         for (SpatialDatabaseRecord r : results) {
+            Geometry geometry = r.getGeometry();
             addGeomStats(r.getGeomNode());
         }
         return dumpGeomStats();
