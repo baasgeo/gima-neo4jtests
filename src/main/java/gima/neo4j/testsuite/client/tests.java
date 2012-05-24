@@ -62,10 +62,14 @@ public class tests implements EntryPoint {
         tableMedemblik.db = Messages.Db.MEDEMBLIK;
         tableMedemblik.routes = new double[][]{
             {5.09060, 52.76522, 5.10949, 52.76080},
-            {5.11160, 52.77358, 5.10554, 52.76486}};
+            {5.11160, 52.77358, 5.10554, 52.76486},
+            {5.09623, 52.77227, 5.10315, 52.76724},
+            {5.10528, 52.76338, 5.10885, 52.76078}};
         tableMedemblik.bboxes = new double[][]{
             {5.09623, 52.77227, 5.10315, 52.76724}, //Meerlaan
-            {5.10528, 52.76338, 5.10885, 52.76078}};
+            {5.10528, 52.76338, 5.10885, 52.76078},
+            {5.09492, 52.77134, 5.11173, 52.76151},
+            {5.10725, 52.77271, 5.11791, 52.76455}};
         tableMedemblik.points = new double[][]{
             {5.09060, 52.76522},
             {5.10949, 52.76080},
@@ -82,12 +86,15 @@ public class tests implements EntryPoint {
         tableAmsterdam.description = "Spatial tests on Open Street Map data from the Amsterdam area";
         tableAmsterdam.db = Messages.Db.AMSTERDAM;
         tableAmsterdam.routes = new double[][]{
-            {4.8949, 52.3692, 4.8594, 52.3576},
+            {4.8862, 52.3677, 4.8594, 52.3576}, //4.8949 52.3692
+            {4.8620, 52.3282, 4.8873, 52.3257},
+            {4.9117, 52.4053, 4.9489, 52.3884},
             {4.9217, 52.3602, 4.9412, 52.3302}};
         tableAmsterdam.bboxes = new double[][]{
             {4.88557, 52.37674, 4.91214, 52.36694}, //Centre of Amsterdam
             {4.84779, 52.37478, 4.86592, 52.36498}, //Old West
-            {4.94322, 52.34834, 4.96767, 52.33037}};
+            {4.94322, 52.34834, 4.96767, 52.33037},
+            {4.81342, 52.43037, 4.98180, 52.32305}};
         tableAmsterdam.points = new double[][]{ 
             {4.8594, 52.3576},
             {4.8799, 52.3931},  
@@ -104,22 +111,20 @@ public class tests implements EntryPoint {
         tableNl.description = "Spatial tests on Open Street Map data from North-Holland";
         tableNl.db = Messages.Db.NH;
         tableNl.routes = new double[][]{
-            {4.8949, 52.3692, 4.8594, 52.3576},
-            {4.9217, 52.3602, 4.9412, 52.3302},
-            {4.88557, 52.37674, 4.91214, 52.36694}, //Centre of Amsterdam
+            {4.8862, 52.3677, 4.8594, 52.3576},
+            {4.8620, 52.3282, 4.8873, 52.3257},
             {5.09060, 52.76522, 4.88557, 52.37674},   //Medemblik to Amsterdam
-            {4.84779, 52.37478, 4.86592, 52.36498}};
+            {5.09060, 52.76522, 5.10949, 52.76080}};
         tableNl.bboxes = new double[][]{
             {5.09623, 52.77227, 5.10315, 52.76724}, //Meerlaan
             {5.10528, 52.76338, 5.10885, 52.76078},
-            {4.88557, 52.37674, 4.91214, 52.36694}, //Centre of Amsterdam
-            {4.84779, 52.37478, 4.86592, 52.36498}, //Old West
-            {4.94322, 52.34834, 4.96767, 52.33037}};
+            {4.81342, 52.43037, 4.98180, 52.323}, //Amsterdam
+            {4.73166, 52.68332, 4.98294, 52.37542}}; // Big part of Nort-Holland
         tableNl.points = new double[][]{
-            {4.8949, 52.3692}, {4.8594, 52.3576},
-            {4.8799, 52.3931}, {4.8954, 52.3996},
-            {4.8339, 52.3539}, {4.9465, 52.3973},
-            {4.9217, 52.3602}, {4.9412, 52.3302}};
+            {4.8799, 52.3931},  
+            {4.9465, 52.3973},
+            {5.11160, 52.77358},
+            {5.10554, 52.76486}};
         tableNl.setSize("100%", "330px");
         tabDashboard.add(tabPanelNl, tableNl.Name(), false);
         tableNl.SetupGui();

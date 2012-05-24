@@ -35,6 +35,7 @@ public class GridTable extends Grid {
     public double[][] routes;    
     public double[][] bboxes;    
     public double[][] points;
+    public double[][] joinpolygon;
 
     public GridTable() {
         this.messages = new GwtMessages(scrollPanel, log);
@@ -195,6 +196,12 @@ public class GridTable extends Grid {
         this.setWidget(4, 3, lblTest3);
 
         Button btnTest4 = new Button(Constants.TEST4);
+        btnTest4.addClickHandler(new ClickHandler() {
+
+            public void onClick(ClickEvent event) {
+                messages.SendMessage(Messages.Type.TEST_GML, db, bboxes, store);
+            }
+        });
         this.setWidget(5, 2, btnTest4);
 
         Label lblTest4 = new Label(Constants.Labels.TEST4);

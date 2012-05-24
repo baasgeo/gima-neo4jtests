@@ -53,7 +53,7 @@ public class OSMTests {
 
     public static GeoPipeFlow findClosestNode(Coordinate coordinate, Layer layer) {
         GeoPipeline pipe = GeoPipeline
-                .startNearestNeighborLatLonSearch(layer, coordinate, 10)
+                .startNearestNeighborLatLonSearch(layer, coordinate, 0.5)
                 .sort("OrthodromicDistance")
                 .getMin("OrthodromicDistance")
                 .copyDatabaseRecordProperties();
@@ -73,10 +73,14 @@ public class OSMTests {
         com.vividsolutions.jts.geom.Envelope bbox = Utilities.fromNeo4jToJts(envelope);
         // TODO why a SearchWithin and not a SearchIntersectWindow?
         //return GeoPipeline.startWithinSearch(layer, layer.getGeometryFactory().toGeometry(envelope)).toNodeList();
-        GeoPipeline pipeline = OSMGeoPipeline.startWithinSearch(layer, layer.getGeometryFactory().toGeometry(bbox)).getGeometryType();
-        GeoPipeline pipeline2 = OSMGeoPipeline.startOsm(layer)
-                .withinFilter(layer.getGeometryFactory().toGeometry(bbox))
+        GeoPipeline pipeline = OSMGeoPipeline
+                .startWithinSearch(layer, layer.getGeometryFactory().toGeometry(bbox))
+                .copyDatabaseRecordProperties()
                 .getGeometryType();
+        
+        //GeoPipeline pipeline2 = OSMGeoPipeline.startOsm(layer)
+        //        .withinFilter(layer.getGeometryFactory().toGeometry(bbox))
+        //        .getGeometryType();
         
         //print(pipeline2);
         //GeometryType = LineString, Point, Polygon
@@ -85,6 +89,17 @@ public class OSMTests {
         //LayerIndexReader index = layer.getIndex();
         //SearchRecords search = index.search(filter);
         //System.out.println("Index found: " + search.count());
+
+        return pipeline;
+    }
+    
+    public static GeoPipeline findGeometriesInLayerToGML(Layer layer, org.neo4j.collections.rtree.Envelope envelope) {
+        com.vividsolutions.jts.geom.Envelope bbox = Utilities.fromNeo4jToJts(envelope);
+        // TODO why a SearchWithin and not a SearchIntersectWindow?
+        //return GeoPipeline.startWithinSearch(layer, layer.getGeometryFactory().toGeometry(envelope)).toNodeList();
+        GeoPipeline pipeline = OSMGeoPipeline
+                .startWithinSearch(layer, layer.getGeometryFactory().toGeometry(bbox))
+                .createGML();
 
         return pipeline;
     }

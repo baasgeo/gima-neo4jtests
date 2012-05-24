@@ -5,14 +5,17 @@
 package gima.neo4j.testsuite.server;
 
 import com.vividsolutions.jts.geom.Coordinate;
+import gima.neo4j.testsuite.osmcheck.Parser;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.charset.Charset;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 import javax.xml.stream.XMLStreamException;
 
 import org.apache.log4j.Logger;
@@ -21,6 +24,7 @@ import org.geotools.data.neo4j.DefaultResourceInfo;
 import org.neo4j.collections.rtree.Envelope;
 import org.neo4j.collections.rtree.NullListener;
 import org.neo4j.gis.spatial.ConsoleListener;
+import org.neo4j.gis.spatial.DynamicLayerConfig;
 import org.neo4j.gis.spatial.EditableLayer;
 import org.neo4j.gis.spatial.Layer;
 import org.neo4j.gis.spatial.SpatialDatabaseRecord;
@@ -29,6 +33,7 @@ import org.neo4j.gis.spatial.Utilities;
 import org.neo4j.gis.spatial.osm.OSMImporter;
 import org.neo4j.gis.spatial.osm.OSMLayer;
 import org.neo4j.gis.spatial.pipes.GeoPipeFlow;
+import org.neo4j.gis.spatial.pipes.GeoPipeline;
 import org.neo4j.gis.spatial.pipes.osm.OSMGeoPipeline;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
@@ -154,7 +159,11 @@ public class Neo {
         return results;
     }
 
-    public String ImportOSM() throws IOException, XMLStreamException, InterruptedException {
+    public String ImportOSM(boolean extralayers) throws IOException, XMLStreamException, InterruptedException {
+        Parser parser = new Parser(osmfile);
+        parser.runExample();
+        
+        
         if (isRunning == false) {
             return "You have to start the database first.";
         } else {
@@ -168,9 +177,9 @@ public class Neo {
             System.out.println("\n=== Loading layer " + layerName + " from " + osmPath + " ===");
             long start = System.currentTimeMillis();
 
-            OSMImporter importer = new OSMImporter(layerName, new ConsoleListener());
+            gima.neo4j.testsuite.osmcheck.OSMImporter importer = new gima.neo4j.testsuite.osmcheck.OSMImporter(layerName, new ConsoleListener());
             //importer.setCharset(Charset.forName("UTF-8"));
-            importer.importFile(graphService, osmPath, false, 5000);
+            importer.importFile(graphService, osmPath, true, 5000);
 
             // Weird hack to force GC on large loads
             if (System.currentTimeMillis() - start > 300000) {
@@ -182,13 +191,17 @@ public class Neo {
             importer.reIndex(graphService, 5000, true, false);
             Stop();
             Start();
-
+            
+            if (extralayers) {
+                OSMExports.addDynamicLayers(graphService, osmLayer());
+            }
+            
             results = results + "<br>" + OSMStats.printDatabaseStats(osmLayer());
             return results;
         }
     }
 
-    public String ImportOSM_Batch() throws XMLStreamException, IOException, InterruptedException {
+    public String ImportOSM_Batch(boolean extralayers) throws XMLStreamException, IOException, InterruptedException {
         if (isRunning == true) {
             return "You have to stop the database first.";
         } else {
@@ -197,25 +210,35 @@ public class Neo {
                 return "Could not find the osm-file.";
             }
 
-            Delete();
+            Delete();            
             String results = "<i>Importing osm data (batch):</i>";
             results = results + "<br>Loading layer " + layerName + " from " + osmfile;
             System.out.println("\n=== B A T C H :: Loading layer " + layerName + " from " + osmPath + " ===");
 
             // The sequence here is: start batch inserter, import file, shutdown batch inserter, start database, reindex, shutdown database 
-            OSMImporter importer = new OSMImporter(layerName, new ConsoleListener());
+            gima.neo4j.testsuite.osmcheck.OSMImporter importer = new gima.neo4j.testsuite.osmcheck.OSMImporter(layerName, new ConsoleListener());
+            //OSMImporter importer = new OSMImporter(layerName, new ConsoleListener());
             //importer.setCharset(Charset.forName("UTF-8"));
 
+            long start = System.currentTimeMillis();
             BatchInserterImpl inserter = new BatchInserterImpl(dbPath.toString());
-            importer.importFile(inserter, osmfile, false);
+            importer.importFile(inserter, osmfile, true);
+            long batchEnd = System.currentTimeMillis();
+            results = results + "<br>Batchinserter took: " + (batchEnd - start) / 1000.0 + " sec";
 
             inserter.getGraphDbService().shutdown();
             graphService = new EmbeddedGraphDatabase(dbPath.toString(), mapConfig);
-            importer.reIndex(graphService, 5000, true, false);
+            importer.reIndex(graphService, 10000, true, false);
+            long indexEnd = System.currentTimeMillis();
+            results = results + "<br>Indexing took: " + (indexEnd - batchEnd) / 1000.0 + " sec";
             Stop();
             Start();
 
-            results = results + "<br>" + OSMStats.printDatabaseStats(osmLayer());
+            if (extralayers) {
+                OSMExports.addDynamicLayers(graphService, osmLayer());
+            }
+            
+            results = results + "<br>" + OSMStats.printDatabaseStats((EmbeddedGraphDatabase)graphService);
             return results;
         }
     }
@@ -235,15 +258,17 @@ public class Neo {
         if (isRunning == false) {
             return "You have to start the database first.";
         }
-        String results = "<i>Bouding box results for " + layerName + ":</i>";
+        DynamicLayerConfig dynLayer = osmLayer().addSimpleDynamicLayer(Constants.GTYPE_POINT);
+        
+        String results = "<i>Closest point results for " + layerName + ":</i>";
         for (int i = 0; i < coords.length; i++) {
             long start = System.currentTimeMillis();
 
             Coordinate coord = new Coordinate(coords[i][0], coords[i][1]); // Lon, Lat
-            GeoPipeFlow pipeFlow = OSMTests.findClosestNode(coord, osmLayer());
+            GeoPipeFlow pipeFlow = OSMTests.findClosestNode(coord, dynLayer);
 
             results = results + "<br>Input coordinate: " + coord.toString();
-            results = results + "<br>Found closest node at distance: " + pipeFlow.getProperty("OrthodromicDistance");
+            results = results + "<br>Found closest node at distance: " + ((Double)pipeFlow.getProperty("OrthodromicDistance") * 1000.0);
             results = results + "<br>Node id is: " + pipeFlow.getId();
             results = results + "<br>Nearest neighbor coordinates: " + pipeFlow.getGeometry().getCoordinate().toString();
 
@@ -254,7 +279,7 @@ public class Neo {
         return results;
     }
 
-    public String searchPoints(double[][] coords, Boolean exportimg) {
+    public String searchBbox(double[][] coords, Boolean exportimg) {
         if (isRunning == false) {
             return "You have to start the database first.";
         }
@@ -280,18 +305,18 @@ public class Neo {
                     } else if (flow.getProperties().get("GeometryType") == "Point") {
                         numPoint++;
                     } else if (flow.getProperties().get("GeometryType") == "Polygon") {
-                        numPoint++;
+                        numPoly++;
                     } else {
                         System.out.println(flow.getProperties().get("GeometryType"));
                     }
                     numTotal++;
                 }
-                results = results 
-                        + "<br>" + bbox.toString() 
+                results = results
+                        + "<br>" + bbox.toString()
                         + "<br>Found geometries in bounding box: "
-                        + "<br>Lines: " + numLine 
-                        + "<br>Points: " + numPoint 
-                        + "<br>Polygons: " + numPoly 
+                        + "<br>Points: " + numPoint
+                        + "<br>Lines: " + numLine
+                        + "<br>Polygons: " + numPoly
                         + "<br>Total: " + numTotal;
 
                 //results = results + "<br>Found geometries: " + OSMTests.findGeometriesInLayer(osmLayer(), bbox).count();
@@ -299,6 +324,44 @@ public class Neo {
             }
             results = results + "<br>Operation took: " + (stop - start) + "ms";
             results = results + "<br>-----";
+        }
+        return results;
+    }
+
+        public String getGML(double[][] coords, Boolean exportimg) {
+        if (isRunning == false) {
+            return "You have to start the database first.";
+        }
+        String results = "<i>Bouding box results for " + layerName + ":</i><br>";
+        
+        try {
+            FileWriter outFile = new FileWriter(System.getProperty("user.home") + "/data/" + layerName + ".gml");
+            PrintWriter out = new PrintWriter(outFile);
+            out.println("<?xml version='1.0' encoding='utf-8'?>");
+            out.println("<gml xmlns='http://www.opengis.net/gml/3.2.1'>");
+        
+        String gml = "";
+        for (int i = 0; i < coords.length; i++) {
+            long start = System.currentTimeMillis();
+            long stop;
+            Envelope bbox = new Envelope(coords[i][0], coords[i][2], coords[i][3], coords[i][1]); // double minx, double maxx, double miny, double maxy
+
+            for (GeoPipeFlow flow : OSMTests.findGeometriesInLayerToGML(osmLayer(), bbox)) {
+                //gml = gml + flow.getProperties().get( "GML" );   
+                out.println(flow.getProperties().get( "GML" ));
+            }
+            out.println("</gml>");
+            gml = gml.replace("<", "&lt;");
+            gml = gml.replace(">", "&gt;");
+
+            //results = results + "<br>Found geometries: " + OSMTests.findGeometriesInLayer(osmLayer(), bbox).count();
+            stop = System.currentTimeMillis();
+
+            results = "<br>Operation took: " + (stop - start) + "ms";
+            results = results + "<br>-----";
+        }
+                } catch (IOException ex) {
+            java.util.logging.Logger.getLogger(Neo.class.getName()).log(Level.SEVERE, null, ex);
         }
         return results;
     }
@@ -338,7 +401,7 @@ public class Neo {
             osmRoute.RouteLayerName(osmLayer().getName() + " - Route" + i);
             results = results + "<br>Found nearby startnode: " + osmRoute.StartNodeId() + " for " + startCoord.toString();
             results = results + "<br>Found nearby endnode: " + osmRoute.EndNodeId() + " for " + endCoord.toString();
-            results = results + "<br>Node search time: " + osmRoute.NodeSearchTime()+ "ms";
+            results = results + "<br>Node search time: " + osmRoute.NodeSearchTime() + "ms";
             results = results + "<br>" + osmRoute.dijkstra();
             if (storeRoute) {
                 results = results + "<br>Route is stored in layer: " + osmLayer().getName() + " - Route" + i;
@@ -348,6 +411,43 @@ public class Neo {
             results = results + "<br>-----";
         }
         return results;
+    }
+
+    public String SpatialJoin(double[][] polygon, Boolean exportimg) {
+        //DISJOINT(the_geom, POLYGON((-90 40, -90 45, -60 45, -60 40, -90 40)))
+        String results = "<i>Spatial join for " + layerName + ":</i>";
+        
+        long start = System.currentTimeMillis();
+        long stop;
+        try {
+            GeoPipeline pipe = GeoPipeline.start(osmLayer()) 
+                    .cqlFilter("name = Beckmanstraat")
+                    //.cqlFilter("DISJOINT(buffer(the_geom, 20), POINT(4.88557 52.37674))")
+                    .copyDatabaseRecordProperties();
+            //DISJOINT(buffer(the_geom, 10) , POINT(1 2))
+
+            System.out.println(pipe.toString());
+
+            if (exportimg == true) {
+                OSMExports.exportImageSnippet(graphService, pipe, osmLayer().getName() + "_disjoint");
+                stop = System.currentTimeMillis();
+                results = results + "<br>Exported image to file: " + osmLayer().getName() + "_disjoint";
+            } else {
+                List<GeoPipeFlow> list = pipe.toList();
+                //System.out.println("Found close node at distance: " + closests.get(0).getProperty("OrthodromicDistance"));
+                //System.out.println("Coordinates are: " + closests.get(0).getGeometry().getCoordinate().toString());
+                for (GeoPipeFlow pipeFlow : list) {
+                    for (String prop : pipeFlow.getPropertyNames()) {
+                        if (pipeFlow.getProperty(prop) != null) {
+                            System.out.println("\t" + prop + ":" + pipeFlow.getProperty(prop));
+                        }
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            return ex.toString();
+        }
+        return "";
     }
 
     public String MakeTopology() {
@@ -369,7 +469,10 @@ public class Neo {
         Transaction tx = graphService.beginTx();
         try {
             // new SearchAll()
-            List<SpatialDatabaseRecord> list = OSMGeoPipeline.startOsm(osmLayer()).cqlFilter("highway is not null and highway not in ('cycleway','footway','pedestrain','service') and the_geom IS NOT NULL and geometryType(the_geom) = 'LineString'") //.cqlFilter("highway is not null and geometryType(the_geom) = 'LineString'")
+            List<SpatialDatabaseRecord> list = OSMGeoPipeline
+                    .startOsm(osmLayer())
+                    .cqlFilter("highway is not null and highway not in ('cycleway','footway','pedestrain','service') and the_geom IS NOT NULL and geometryType(the_geom) = 'LineString'") //.cqlFilter("highway is not null and geometryType(the_geom) = 'LineString'")
+                    .copyDatabaseRecordProperties()
                     .toSpatialDatabaseRecordList();
 
             int listCount = list.size();
@@ -440,6 +543,7 @@ public class Neo {
     }
 
     public String Stop() {
+        
         spatialService = null;
         graphService.shutdown();
         graphService = null;

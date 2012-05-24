@@ -8,6 +8,10 @@ import com.google.gwt.user.server.rpc.RemoteServiceServlet;
 import gima.neo4j.testsuite.client.GwtService;
 import gima.neo4j.testsuite.shared.Messages;
 import java.io.File;
+import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.xml.stream.XMLStreamException;
 
 /**
  *
@@ -16,6 +20,7 @@ import java.io.File;
 public class GwtServiceImpl extends RemoteServiceServlet implements GwtService {
 
     private static File basePath = new File(System.getProperty("user.home") + "/data/neodb");
+    private Neo simpleDb = new Neo();
     private Neo medemblikDb = new Neo();
     private Neo amsterdamDb = new Neo();
     private Neo nhDb = new Neo();
@@ -30,6 +35,16 @@ public class GwtServiceImpl extends RemoteServiceServlet implements GwtService {
                     medemblikDb.osmfile = (System.getProperty("user.home") + "/data/osm/medemblik.osm");
                     medemblikDb.mapConfig = Neo.NORMAL_CONFIG;
                 }
+                /**if (!simpleDb.isRunning()) {
+                    simpleDb.layerName = "Simple";
+                    simpleDb.dbPath = new File(basePath, "simple.gdb");
+                    simpleDb.osmfile = (System.getProperty("user.home") + "/data/osm/simple.osm");
+                    simpleDb.mapConfig = Neo.NORMAL_CONFIG;
+                    try {
+                    simpleDb.ImportOSM_Batch(true);
+                    } catch (Exception ex) { }
+                }
+                */
                 return SendOperation(medemblikDb, type, obj, store);
             case AMSTERDAM:
                 if (!amsterdamDb.isRunning()) {
@@ -57,7 +72,7 @@ public class GwtServiceImpl extends RemoteServiceServlet implements GwtService {
         try {
             switch (type) {
                 case TEST_EMPTY:
-                    return "Empty callback.";
+                    return "Nothing to do";
                 case START:
                     return instance.Start();
                 case STOP:
@@ -69,11 +84,11 @@ public class GwtServiceImpl extends RemoteServiceServlet implements GwtService {
                 case DOTESTS:
                     return instance.DoTests();
                 case MAKE_OSM:
-                    if (store) {
-                        return instance.ImportOSM();
-                    } else {
-                        return instance.ImportOSM_Batch();
-                    }
+                    //if (store) {
+                    //    return instance.ImportOSM(store);
+                    //} else {
+                        return instance.ImportOSM_Batch(store);
+                    //}
                 case MAKE_NETWORK:
                     return instance.MakeTopology();
                 case MAKE_DYNAMICLAYERS:
@@ -83,9 +98,13 @@ public class GwtServiceImpl extends RemoteServiceServlet implements GwtService {
                 case TEST_CLOSEPOINT:
                     return instance.findClosestNode(obj, store);
                 case TEST_BOUNDINGBOX:
-                    return instance.searchPoints(obj, store);
+                    return instance.searchBbox(obj, store);
+                case TEST_GML:
+                    return instance.getGML(obj, store);
                 case TEST_ROUTE:
                     return instance.ShortestPath(obj, store);
+                case TEST_JOIN:
+                    return instance.SpatialJoin(obj, store);
                 default:
                     return "<div class=red>Not implemented yet.</red>";
             }

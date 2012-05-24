@@ -53,7 +53,9 @@ public class Messages {
       TEST_CLOSEPOINT,
       TEST_EXPORTLAYERS,
       TEST_BOUNDINGBOX,
+      TEST_GML,
       TEST_EMPTY,
+      TEST_JOIN,
       TEST_ROUTE,
 
   }

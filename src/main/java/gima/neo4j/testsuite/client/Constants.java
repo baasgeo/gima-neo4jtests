@@ -21,7 +21,7 @@ public interface Constants {
     static String TEST1 = "Bounding box";
     static String TEST2 = "Closest point";
     static String TEST3 = "Route";
-    static String TEST4 = "Test4";
+    static String TEST4 = "GML request";
     static String TEST5 = "Test5";
 
     public class Labels {
@@ -39,7 +39,7 @@ public interface Constants {
         static String TEST1 = "Send bouding box queries to the server";
         static String TEST2 = "Find the closest node in the network from lat/lon";
         static String TEST3 = "Shortest path test";
-        static String TEST4 = "New label";
+        static String TEST4 = "Get GML data from bouding box";
         static String TEST5 = "New label";
     }
 
